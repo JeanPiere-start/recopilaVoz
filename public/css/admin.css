@@ -313,3 +313,45 @@ body.tema-admin {
     align-items: stretch;
   }
 }
+
+/* ========================================================================
+   CONFIGURACION DE GRABACION
+   ======================================================================== */
+.config-grabacion-tarjeta {
+  background: var(--color-superficie-1);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-lg);
+  padding: 32px;
+  max-width: 600px;
+}
+
+.config-estado {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding: 20px;
+  background: var(--color-superficie-2);
+  border-radius: var(--radio-md);
+  border: 1px solid var(--color-borde);
+}
+
+.config-estado-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.config-estado-etiqueta {
+  font-size: 0.8125rem;
+  color: var(--color-texto-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.config-estado-valor {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--color-primario);
+  font-family: var(--fuente-mono);
+}
