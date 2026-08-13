@@ -229,7 +229,10 @@
         <div id="tab-comandos" class="admin-tab">
             <div class="admin-cabecera">
                 <h2 class="admin-titulo-pagina">Gestion de comandos</h2>
-                <button id="btn-nuevo-comando" class="boton boton-primario boton-pequeno">Nuevo comando</button>
+                <div style="display:flex; gap:8px;">
+                    <button id="btn-lote-comandos" class="boton boton-secundario boton-pequeno">Crear en lote</button>
+                    <button id="btn-nuevo-comando" class="boton boton-primario boton-pequeno">Nuevo comando</button>
+                </div>
             </div>
 
             <div id="lista-comandos-admin" class="lista-comandos-admin">
@@ -388,6 +391,61 @@
                 <button type="submit" id="btn-guardar-comando" class="boton boton-primario">Guardar</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODAL: Crear comandos en lote                                         -->
+<!-- ====================================================================== -->
+<div id="modal-lote" class="modal-overlay oculto" role="dialog" aria-modal="true" aria-label="Crear comandos en lote">
+    <div class="modal-contenido modal-lote">
+        <div class="modal-cabecera">
+            <div>
+                <h3 class="modal-titulo">Crear comandos en lote</h3>
+                <p class="modal-subtitulo">Un comando por línea. Agrega descripción con <code>|</code> separador.</p>
+            </div>
+            <button id="modal-lote-cerrar" class="boton-icono" aria-label="Cerrar">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="lote-ejemplo">
+            <span class="lote-ejemplo-titulo">Ejemplo:</span>
+            <pre class="lote-ejemplo-codigo">Adelante
+Atras
+Izquierda | Gira a la izquierda
+Derecha | Gira a la derecha
+Detente | Para el movimiento</pre>
+        </div>
+
+        <div class="campo-grupo">
+            <label class="campo-etiqueta" for="lote-textarea">Comandos <span id="lote-contador" class="lote-contador">0 comandos</span></label>
+            <textarea
+                id="lote-textarea"
+                class="campo-textarea lote-textarea"
+                rows="10"
+                placeholder="Adelante
+Atras
+Izquierda | Gira a la izquierda
+Derecha | Gira a la derecha"
+            ></textarea>
+        </div>
+
+        <div id="lote-progreso" class="lote-progreso oculto">
+            <div class="lote-barra-fondo">
+                <div id="lote-barra-fill" class="lote-barra-fill" style="width:0%"></div>
+            </div>
+            <span id="lote-progreso-texto" class="lote-progreso-texto">Creando...</span>
+        </div>
+
+        <div id="lote-error" class="mensaje-error oculto"></div>
+
+        <div class="modal-acciones">
+            <button type="button" id="btn-lote-cancelar" class="boton boton-fantasma">Cancelar</button>
+            <button type="button" id="btn-lote-crear" class="boton boton-primario">Crear todos</button>
+        </div>
     </div>
 </div>
 
