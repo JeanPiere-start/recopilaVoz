@@ -102,6 +102,14 @@
                     Comandos
                 </button>
             </li>
+            <li>
+                <button class="sidebar-item" data-tab="tab-configuracion" id="nav-configuracion">
+                    <svg class="sidebar-icono" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+                    </svg>
+                    Configuracion
+                </button>
+            </li>
         </ul>
 
         <div class="sidebar-footer">
@@ -226,6 +234,71 @@
 
             <div id="lista-comandos-admin" class="lista-comandos-admin">
                 <div class="cargando-comandos"><div class="spinner"></div> Cargando...</div>
+            </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- TAB: Configuracion de Grabacion                                -->
+        <!-- ============================================================== -->
+        <div id="tab-configuracion" class="admin-tab">
+            <div class="admin-cabecera">
+                <h2 class="admin-titulo-pagina">Configuracion de grabacion</h2>
+            </div>
+
+            <div class="admin-seccion">
+                <p style="color: var(--color-texto-2); margin-bottom: 24px; font-size: 0.9375rem;">
+                    Estos parametros se aplican globalmente a todos los participantes al iniciar una nueva grabacion.
+                </p>
+
+                <div class="config-grabacion-tarjeta">
+                    <div class="config-estado" id="config-estado-actual">
+                        <div class="config-estado-item">
+                            <span class="config-estado-etiqueta">Duracion actual</span>
+                            <span class="config-estado-valor" id="config-valor-duracion">--- s</span>
+                        </div>
+                        <div class="config-estado-item">
+                            <span class="config-estado-etiqueta">Tasa de muestreo actual</span>
+                            <span class="config-estado-valor" id="config-valor-tasa">--- Hz</span>
+                        </div>
+                    </div>
+
+                    <form id="form-config-grabacion" autocomplete="off">
+                        <div class="campo-grupo">
+                            <label class="campo-etiqueta" for="config-duracion">Duracion de la grabacion (segundos)</label>
+                            <select id="config-duracion" class="campo-select">
+                                <option value="1">1 segundo</option>
+                                <option value="2">2 segundos</option>
+                                <option value="3" selected>3 segundos</option>
+                                <option value="4">4 segundos</option>
+                                <option value="5">5 segundos</option>
+                                <option value="6">6 segundos</option>
+                                <option value="7">7 segundos</option>
+                                <option value="8">8 segundos</option>
+                                <option value="9">9 segundos</option>
+                                <option value="10">10 segundos</option>
+                            </select>
+                            <span class="campo-ayuda">Tiempo que dura cada grabacion de los participantes.</span>
+                        </div>
+
+                        <div class="campo-grupo">
+                            <label class="campo-etiqueta" for="config-tasa">Frecuencia de muestreo</label>
+                            <select id="config-tasa" class="campo-select">
+                                <option value="8000">8 000 Hz &mdash; Baja calidad (telefono)</option>
+                                <option value="16000" selected>16 000 Hz &mdash; Estandar para voz (recomendado)</option>
+                                <option value="22050">22 050 Hz &mdash; Calidad media</option>
+                                <option value="44100">44 100 Hz &mdash; Calidad CD</option>
+                            </select>
+                            <span class="campo-ayuda">Frecuencia de muestreo del archivo WAV resultante.</span>
+                        </div>
+
+                        <div id="config-error" class="mensaje-error oculto"></div>
+
+                        <div class="modal-acciones" style="justify-content: flex-start; margin-top: 24px;">
+                            <button type="submit" id="btn-guardar-config" class="boton boton-primario">Guardar configuracion</button>
+                            <button type="button" id="btn-recargar-config" class="boton boton-fantasma">Actualizar estado</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
