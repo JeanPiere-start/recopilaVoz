@@ -41,6 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let audioBlobTemporal = null;
     let duracionTemporal = 0;
     
+    // Configuracion de grabacion (se obtiene del servidor)
+    let configGrabacion = { duracion_s: 3, tasa_hz: 16000 };
+    
     // Espectrograma en vivo
     let intervaloVivo = null;
     let analyserNode = null;
@@ -88,13 +91,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnConfirmar.addEventListener('click', subirGrabacion);
 
+    const META_POR_COMANDO = 40;
+    let conteoComandosUsuario = {};
+
     // Funciones
+    async function cargarConfigGrabacion() {
+        try {
+            const res = await fetch('/api/config-grabacion');
+            const data = await res.json();
+            configGrabacion = data.config || configGrabacion;
+            // Actualizar texto del boton
+            if (btnGrabar) {
+                btnGrabar.innerHTML = `<span class="boton-grabar-punto"></span> Grabar (${configGrabacion.duracion_s} seg)`;
+            }
+        } catch (e) {
+            console.warn('No se pudo cargar config de grabacion, usando valores por defecto');
+        }
+    }
+
     function iniciarSesion(nuevoAlias) {
         alias = nuevoAlias;
-        sessionStorage.setItem('alias', alias);
+        sessionStorage.getItem('alias') || sessionStorage.setItem('alias', alias);
         pantallaIngreso.style.display = 'none';
         pantallaPrincipal.style.display = 'block';
         if (etiquetaAliasHeader) etiquetaAliasHeader.textContent = alias;
+        cargarConfigGrabacion();
         cargarComandos();
         cargarMisGrabaciones();
     }
@@ -113,10 +134,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderizarComandos() {
         listaComandos.innerHTML = '';
         comandos.forEach(cmd => {
+            const conteo = conteoComandosUsuario[cmd.nombre] || 0;
+            const esCompletado = conteo >= META_POR_COMANDO;
+            
             const item = document.createElement('div');
-            item.className = 'item-comando pendiente';
+            item.className = `item-comando ${esCompletado ? 'completado' : 'pendiente'}`;
+            if (comandoSeleccionado && comandoSeleccionado.id === cmd.id) {
+                item.classList.add('activo');
+            }
             item.dataset.id = cmd.id;
-            item.textContent = cmd.nombre;
+            item.innerHTML = `
+                <span class="cmd-nombre-texto">${cmd.nombre}</span>
+                <span class="cmd-conteo-badge">${conteo}/${META_POR_COMANDO}</span>
+            `;
             item.addEventListener('click', () => seleccionarComando(cmd, item));
             listaComandos.appendChild(item);
         });
@@ -124,14 +154,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function seleccionarComando(cmd, elementoHtml) {
-        // Actualizar UI
         document.querySelectorAll('.item-comando').forEach(el => el.classList.remove('activo'));
         elementoHtml.classList.add('activo');
         comandoSeleccionado = cmd;
 
+        const conteo = conteoComandosUsuario[cmd.nombre] || 0;
         panelGrabacion.style.display = 'block';
-        comandoNombre.textContent = cmd.nombre;
-        comandoInstruccion.textContent = cmd.descripcion;
+        if (comandoNombre) {
+            if (conteo >= META_POR_COMANDO) {
+                comandoNombre.textContent = `${cmd.nombre} (¡Meta alcanzada! ${conteo}/${META_POR_COMANDO})`;
+            } else {
+                comandoNombre.textContent = `${cmd.nombre} (Grabación ${conteo + 1} de ${META_POR_COMANDO})`;
+            }
+        }
+        if (comandoInstruccion) {
+            comandoInstruccion.textContent = `${cmd.descripcion} (Objetivo: ${META_POR_COMANDO} grabaciones)`;
+        }
         panelResultado.style.display = 'none';
         btnGrabar.style.display = 'block';
         btnDetener.style.display = 'none';
@@ -142,12 +180,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function actualizarProgreso() {
-        const completados = document.querySelectorAll('.item-comando.completado').length;
-        const total = comandos.length;
-        const porcentaje = total > 0 ? (completados / total) * 100 : 0;
+        let totalGrabados = 0;
+        comandos.forEach(cmd => {
+            totalGrabados += Math.min(META_POR_COMANDO, conteoComandosUsuario[cmd.nombre] || 0);
+        });
+        const totalMeta = comandos.length * META_POR_COMANDO;
+        const porcentaje = totalMeta > 0 ? (totalGrabados / totalMeta) * 100 : 0;
+        
         if (barraProgreso) barraProgreso.style.width = `${porcentaje}%`;
-        if (progresoGrabados) progresoGrabados.textContent = completados;
-        if (progresoTotal) progresoTotal.textContent = total;
+        if (progresoGrabados) progresoGrabados.textContent = totalGrabados;
+        if (progresoTotal) progresoTotal.textContent = totalMeta;
     }
 
     async function iniciarGrabacion() {
@@ -157,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnGrabar.style.display = 'none';
         btnDetener.style.display = 'block';
         
-        grabador = new Grabador();
+        grabador = new Grabador(configGrabacion.tasa_hz);
         
         grabador.onNivelVoz = (nivel) => {
             if (vuBarra) {
@@ -168,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await grabador.iniciar();
             iniciarEspectrogramaVivo();
-            iniciarTemporizador(3); 
+            iniciarTemporizador(configGrabacion.duracion_s);
         } catch (err) {
             mostrarToast('Error al acceder al microfono', 'error');
             estadoGrabacion.textContent = 'Listo';
@@ -303,13 +345,21 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (data.exito) {
                 mostrarToast('Grabacion subida con exito', 'exito');
-                // Marcar como completado
-                const el = document.querySelector(`.item-comando[data-id="${comandoSeleccionado.id}"]`);
-                if (el) {
-                    el.classList.remove('pendiente');
-                    el.classList.add('completado');
+                
+                // Actualizar conteo local inmediatamente
+                const cmdNombre = comandoSeleccionado.nombre;
+                conteoComandosUsuario[cmdNombre] = (conteoComandosUsuario[cmdNombre] || 0) + 1;
+                renderizarComandos();
+                
+                const nuevoConteo = conteoComandosUsuario[cmdNombre];
+                if (comandoNombre) {
+                    if (nuevoConteo >= META_POR_COMANDO) {
+                        comandoNombre.textContent = `${cmdNombre} (¡Meta alcanzada! ${nuevoConteo}/${META_POR_COMANDO})`;
+                    } else {
+                        comandoNombre.textContent = `${cmdNombre} (Grabación ${nuevoConteo + 1} de ${META_POR_COMANDO})`;
+                    }
                 }
-                actualizarProgreso();
+                
                 cargarMisGrabaciones();
                 
                 // Reset panel
@@ -331,19 +381,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             listaMisGrabaciones.innerHTML = '';
             
+            conteoComandosUsuario = {};
             if (data.grabaciones) {
                 data.grabaciones.forEach(grab => {
+                    conteoComandosUsuario[grab.comando] = (conteoComandosUsuario[grab.comando] || 0) + 1;
+                    
                     const div = document.createElement('div');
                     div.className = 'tarjeta-grabacion';
                     div.innerHTML = `
                         <h4>Comando: ${grab.comando}</h4>
-                        <p>Duracion: ${grab.duracion_s} s</p>
+                        <p>Duración: ${grab.duracion_s} s</p>
                         <p>Fecha: ${new Date(grab.created_at).toLocaleString()}</p>
                         <audio controls src="${grab.url_audio}"></audio>
                     `;
                     listaMisGrabaciones.appendChild(div);
                 });
             }
+            renderizarComandos();
         } catch (error) {
             mostrarToast('Error al cargar mis grabaciones', 'error');
         }

@@ -87,13 +87,14 @@ async function remuestrear(audioBuffer, tasaObjetivo = 16000) {
  *   onNivelVoz(nivel) - nivel RMS en tiempo real [0,1] para vu-meter
  */
 class Grabador {
-    constructor() {
+    constructor(tasaHz = 16000) {
         this.mediaRecorder = null;
         this.chunks = [];
         this.stream = null;
         this.audioCtx = null;
         this.analizador = null;
         this.animFrameId = null;
+        this.tasaHz = tasaHz; // Tasa de muestreo configurable
 
         // Callbacks
         this.onIniciar = null;
@@ -163,7 +164,7 @@ class Grabador {
         }
     }
 
-    /** Procesa el audio grabado: decodifica, remuestrea a 16 kHz, genera WAV. */
+    /** Procesa el audio grabado: decodifica, remuestrea a la tasa configurada, genera WAV. */
     async _procesarAudio() {
         try {
             const blob = new Blob(this.chunks, { type: this.mediaRecorder.mimeType || 'audio/webm' });
@@ -174,15 +175,15 @@ class Grabador {
             const audioBuffer = await ctxDecode.decodeAudioData(arrayBuffer);
             ctxDecode.close();
 
-            // Remuestrear a 16 kHz
-            const muestras16k = await remuestrear(audioBuffer, 16000);
-            const duracion = muestras16k.length / 16000;
+            // Remuestrear a la tasa configurada
+            const muestras = await remuestrear(audioBuffer, this.tasaHz);
+            const duracion = muestras.length / this.tasaHz;
 
             // Generar WAV
-            const wavBuffer = pcmAWav(muestras16k, 16000);
+            const wavBuffer = pcmAWav(muestras, this.tasaHz);
             const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' });
 
-            if (this.onFinalizar) this.onFinalizar(wavBlob, muestras16k, duracion);
+            if (this.onFinalizar) this.onFinalizar(wavBlob, muestras, duracion);
         } catch (err) {
             if (this.onError) this.onError('Error al procesar el audio: ' + err.message);
         }

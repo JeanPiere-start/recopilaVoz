@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabId === 'tab-resumen') cargarResumen();
         else if (tabId === 'tab-grabaciones') cargarGrabaciones();
         else if (tabId === 'tab-comandos') cargarComandos();
+        else if (tabId === 'tab-configuracion') cargarConfigGrabacion();
     }
 
     // --- TAB RESUMEN ---
@@ -123,28 +124,42 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (statGrabaciones) statGrabaciones.textContent = data.totalGrabaciones || 0;
             if (statParticipantes) statParticipantes.textContent = data.totalParticipantes || 0;
-            if (statComandos) statComandos.textContent = data.totalComandos || 0;
+            if (statComandos) statComandos.textContent = data.comandosActivos ? data.comandosActivos.length : 0;
 
-            if (graficoComandos && data.comandos) {
+            if (graficoComandos && data.grabacionesPorComando) {
                 graficoComandos.innerHTML = '';
-                const maxVal = Math.max(...data.comandos.map(c => c.conteo), 1);
-                data.comandos.forEach(c => {
+                const comandosKeys = Object.keys(data.grabacionesPorComando);
+                const maxVal = Math.max(...Object.values(data.grabacionesPorComando), 40);
+                
+                comandosKeys.forEach(cmdNombre => {
+                    const conteo = data.grabacionesPorComando[cmdNombre] || 0;
                     const barra = document.createElement('div');
                     barra.className = 'barra-grafico';
-                    const ancho = (c.conteo / maxVal) * 100;
+                    const ancho = (conteo / maxVal) * 100;
                     barra.innerHTML = `
-                        <div class="barra-etiqueta">${c.comando}</div>
-                        <div class="barra-relleno" style="width: ${ancho}%">${c.conteo}</div>
+                        <div class="barra-etiqueta">${cmdNombre}</div>
+                        <div class="barra-relleno" style="width: ${Math.max(5, ancho)}%">${conteo} audios</div>
                     `;
                     graficoComandos.appendChild(barra);
                 });
             }
 
-            if (tablaParticipantes && data.participantes) {
-                tablaParticipantes.innerHTML = `<tr><th>Alias</th><th>Grabaciones</th></tr>`;
-                data.participantes.forEach(p => {
-                    tablaParticipantes.innerHTML += `<tr><td>${p.alias}</td><td>${p.conteo}</td></tr>`;
-                });
+            if (tablaParticipantes && data.grabacionesPorParticipante) {
+                tablaParticipantes.innerHTML = `
+                    <table class="tabla-datos">
+                        <thead>
+                            <tr><th>Alias Participante</th><th>Total Audios Grabados</th></tr>
+                        </thead>
+                        <tbody>
+                            ${Object.keys(data.grabacionesPorParticipante).map(aliasP => `
+                                <tr>
+                                    <td><strong>${aliasP}</strong></td>
+                                    <td>${data.grabacionesPorParticipante[aliasP]} audios</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
             }
         } catch (err) {
             console.error(err);
@@ -331,5 +346,65 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             toast.classList.remove('visible');
         }, 3000);
+    }
+
+    // --- TAB CONFIGURACION DE GRABACION ---
+    async function cargarConfigGrabacion() {
+        try {
+            const res = await peticionAuth('/api/config-grabacion');
+            const data = await res.json();
+            const cfg = data.config;
+
+            const elDuracion = document.getElementById('config-valor-duracion');
+            const elTasa = document.getElementById('config-valor-tasa');
+            const selDuracion = document.getElementById('config-duracion');
+            const selTasa = document.getElementById('config-tasa');
+
+            if (elDuracion) elDuracion.textContent = `${cfg.duracion_s} segundo${cfg.duracion_s !== 1 ? 's' : ''}`;
+            if (elTasa) elTasa.textContent = `${cfg.tasa_hz.toLocaleString()} Hz`;
+            if (selDuracion) selDuracion.value = String(cfg.duracion_s);
+            if (selTasa) selTasa.value = String(cfg.tasa_hz);
+        } catch (err) {
+            console.error('Error al cargar config de grabacion', err);
+        }
+    }
+
+    const formConfig = document.getElementById('form-config-grabacion');
+    const btnRecargarConfig = document.getElementById('btn-recargar-config');
+    const configError = document.getElementById('config-error');
+
+    if (formConfig) {
+        formConfig.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (configError) configError.classList.add('oculto');
+
+            const duracion_s = parseInt(document.getElementById('config-duracion').value);
+            const tasa_hz = parseInt(document.getElementById('config-tasa').value);
+
+            try {
+                const res = await peticionAuth('/api/admin/config-grabacion', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ duracion_s, tasa_hz })
+                });
+                const data = await res.json();
+
+                if (data.exito) {
+                    mostrarToast(`Configuracion guardada: ${duracion_s}s | ${tasa_hz.toLocaleString()} Hz`, 'exito');
+                    cargarConfigGrabacion();
+                } else {
+                    if (configError) {
+                        configError.textContent = data.error || 'Error al guardar';
+                        configError.classList.remove('oculto');
+                    }
+                }
+            } catch (err) {
+                mostrarToast('Error de conexion al guardar config', 'error');
+            }
+        });
+    }
+
+    if (btnRecargarConfig) {
+        btnRecargarConfig.addEventListener('click', cargarConfigGrabacion);
     }
 });
