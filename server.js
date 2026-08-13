@@ -53,6 +53,12 @@ let memoriaComandos = [
 
 let memoriaGrabaciones = [];
 
+// Configuración de grabación (editable por el admin)
+let configGrabacion = {
+    duracion_s: 3,       // Duración en segundos (1–10)
+    tasa_hz: 16000       // Frecuencia de muestreo (8000, 16000, 22050, 44100)
+};
+
 // ---------------------------------------------------------------------------
 // App Express
 // ---------------------------------------------------------------------------
@@ -571,6 +577,48 @@ app.get('/api/admin/descargar-zip', verificarAdmin, async (req, res) => {
         console.error('[ERROR /api/admin/descargar-zip]', err.message);
         if (!res.headersSent) res.status(500).json({ error: 'Error al generar ZIP.' });
     }
+});
+
+// ---------------------------------------------------------------------------
+// RUTA DE CONFIGURACIÓN DE GRABACIÓN
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/config-grabacion
+ * Devuelve la configuración actual de grabación (pública para que el cliente la use).
+ */
+app.get('/api/config-grabacion', (req, res) => {
+    res.json({ config: configGrabacion });
+});
+
+/**
+ * PUT /api/admin/config-grabacion
+ * Permite al admin actualizar duración y tasa de muestreo.
+ */
+app.put('/api/admin/config-grabacion', verificarAdmin, (req, res) => {
+    const { duracion_s, tasa_hz } = req.body;
+
+    const duracionesValidas = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const tasasValidas = [8000, 16000, 22050, 44100];
+
+    if (duracion_s !== undefined) {
+        const dur = parseInt(duracion_s);
+        if (!duracionesValidas.includes(dur)) {
+            return res.status(400).json({ error: `Duración inválida. Valores permitidos: ${duracionesValidas.join(', ')} segundos.` });
+        }
+        configGrabacion.duracion_s = dur;
+    }
+
+    if (tasa_hz !== undefined) {
+        const tasa = parseInt(tasa_hz);
+        if (!tasasValidas.includes(tasa)) {
+            return res.status(400).json({ error: `Tasa inválida. Valores permitidos: ${tasasValidas.join(', ')} Hz.` });
+        }
+        configGrabacion.tasa_hz = tasa;
+    }
+
+    console.log(`[recopilaVoz] Config grabacion actualizada: duracion=${configGrabacion.duracion_s}s, tasa=${configGrabacion.tasa_hz}Hz`);
+    res.json({ exito: true, config: configGrabacion });
 });
 
 // Redirección SPA
