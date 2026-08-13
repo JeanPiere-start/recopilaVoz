@@ -1,0 +1,315 @@
+/*
+ * admin.css — Estilos para el panel de administración
+ */
+
+/* ========================================================================
+   TEMA ADMIN
+   ======================================================================== */
+body.tema-admin {
+  --color-fondo: hsl(228, 22%, 5%);
+  background-color: var(--color-fondo);
+}
+
+/* ========================================================================
+   AUTENTICACIÓN ADMIN
+   ======================================================================== */
+.auth-contenedor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.auth-tarjeta {
+  background: var(--color-superficie-1);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-xl);
+  box-shadow: var(--sombra-lg);
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth-titulo {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.auth-descripcion {
+  color: var(--color-texto-2);
+  font-size: 0.9375rem;
+  margin-bottom: 24px;
+}
+
+/* ========================================================================
+   BARRA LATERAL (SIDEBAR)
+   ======================================================================== */
+.admin-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 240px;
+  background: var(--color-superficie-1);
+  border-right: 1px solid var(--color-borde);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+}
+
+.sidebar-marca {
+  padding: 24px;
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.sidebar-menu {
+  flex: 1;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: var(--color-texto-2);
+  border-radius: var(--radio-md);
+  cursor: pointer;
+  transition: background var(--trans-rapida), color var(--trans-rapida);
+}
+
+.sidebar-item:hover {
+  background: var(--color-superficie-2);
+  color: var(--color-texto-1);
+}
+
+.sidebar-item.activo {
+  background: var(--color-primario-suave);
+  color: var(--color-primario);
+  font-weight: 500;
+}
+
+.sidebar-icono {
+  width: 20px;
+  text-align: center;
+}
+
+.sidebar-footer {
+  padding: 24px 16px;
+  border-top: 1px solid var(--color-borde);
+}
+
+.sidebar-salir {
+  width: 100%;
+  color: var(--color-error);
+}
+
+.sidebar-salir:hover {
+  background: var(--color-error-suave);
+}
+
+/* ========================================================================
+   CONTENIDO PRINCIPAL ADMIN
+   ======================================================================== */
+.admin-main {
+  margin-left: 240px;
+  padding: 32px 48px;
+  min-height: 100vh;
+}
+
+.admin-tab {
+  display: none;
+}
+
+.admin-tab.activo-tab {
+  display: block;
+  animation: fadeIn var(--trans-normal);
+}
+
+.admin-cabecera {
+  margin-bottom: 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.admin-titulo-pagina {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.admin-subtitulo {
+  color: var(--color-texto-2);
+  font-size: 1rem;
+}
+
+.admin-seccion {
+  margin-bottom: 40px;
+}
+
+/* ========================================================================
+   ESTADÍSTICAS
+   ======================================================================== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.stat-tarjeta {
+  background: var(--color-superficie-1);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-valor {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--color-primario);
+}
+
+.stat-etiqueta {
+  color: var(--color-texto-2);
+  font-size: 0.9375rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.grafico-barras {
+  background: var(--color-superficie-1);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-lg);
+  padding: 24px;
+}
+
+/* ========================================================================
+   TABLAS Y FILTROS
+   ======================================================================== */
+.exportar-acciones {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.filtros-panel {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  align-items: center;
+}
+
+.tabla-contenedor {
+  background: var(--color-superficie-1);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-lg);
+  overflow-x: auto;
+}
+
+.tabla-datos {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tabla-datos th,
+.tabla-datos td {
+  padding: 16px 24px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.tabla-datos th {
+  font-weight: 500;
+  color: var(--color-texto-2);
+  background: var(--color-superficie-2);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tabla-datos tr:last-child td {
+  border-bottom: none;
+}
+
+.tabla-datos tbody tr:hover {
+  background: var(--color-superficie-2);
+}
+
+.tabla-participantes {
+  width: 100%;
+}
+
+.celda-cargando {
+  text-align: center;
+  padding: 48px;
+  color: var(--color-texto-3);
+}
+
+.paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+  color: var(--color-texto-2);
+}
+
+/* ========================================================================
+   LISTA DE COMANDOS (ADMIN)
+   ======================================================================== */
+.lista-comandos-admin {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.tarjeta-comando-admin {
+  background: var(--color-superficie-1);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ========================================================================
+   RESPONSIVE
+   ======================================================================== */
+@media (max-width: 768px) {
+  .admin-sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    border-right: none;
+    border-bottom: 1px solid var(--color-borde);
+  }
+  
+  .sidebar-menu {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 16px;
+  }
+  
+  .admin-main {
+    margin-left: 0;
+    padding: 24px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .filtros-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

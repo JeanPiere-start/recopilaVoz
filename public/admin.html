@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Panel de administracion de RecopilaVoz. Gestion de grabaciones, participantes y comandos.">
+    <title>RecopilaVoz — Panel de Administrador</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="tema-admin">
+
+<!-- ====================================================================== -->
+<!-- PANTALLA DE AUTENTICACION ADMIN                                        -->
+<!-- ====================================================================== -->
+<div id="pantalla-auth" class="pantalla activa">
+    <div class="auth-contenedor">
+        <div class="auth-marca">
+            <div class="marca-icono marca-admin">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                    <rect width="40" height="40" rx="10" fill="url(#gradAdmin)"/>
+                    <rect x="11" y="18" width="18" height="14" rx="2" stroke="white" stroke-width="1.5" fill="none"/>
+                    <path d="M15 18v-4a5 5 0 0 1 10 0v4" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+                    <circle cx="20" cy="24" r="2" fill="white"/>
+                    <defs>
+                        <linearGradient id="gradAdmin" x1="0" y1="0" x2="40" y2="40">
+                            <stop offset="0%" stop-color="#1e40af"/>
+                            <stop offset="100%" stop-color="#6d28d9"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <div>
+                <h1 class="marca-nombre">Panel de Administrador</h1>
+                <p class="marca-subtitulo">RecopilaVoz &mdash; Gestion de corpus</p>
+            </div>
+        </div>
+
+        <div class="auth-tarjeta">
+            <h2 class="auth-titulo">Acceso restringido</h2>
+            <p class="auth-descripcion">Ingresa el token de administrador para continuar.</p>
+
+            <form id="form-auth" autocomplete="off">
+                <div class="campo-grupo">
+                    <label class="campo-etiqueta" for="token-input">Token de administrador</label>
+                    <input
+                        id="token-input"
+                        type="password"
+                        class="campo-texto"
+                        placeholder="Token secreto"
+                        required
+                        autocomplete="current-password"
+                    >
+                </div>
+                <div id="auth-error" class="mensaje-error oculto">Token invalido. Verifica tu clave.</div>
+                <button type="submit" id="btn-auth" class="boton boton-primario boton-bloque">
+                    Ingresar
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- PANEL PRINCIPAL ADMIN                                                  -->
+<!-- ====================================================================== -->
+<div id="panel-admin" class="pantalla">
+
+    <!-- Barra lateral -->
+    <nav class="admin-sidebar">
+        <div class="sidebar-marca">
+            <span class="sidebar-logo">RV</span>
+            <span class="sidebar-nombre">Admin</span>
+        </div>
+
+        <ul class="sidebar-menu">
+            <li>
+                <button class="sidebar-item activo" data-tab="tab-resumen" id="nav-resumen">
+                    <svg class="sidebar-icono" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+                    </svg>
+                    Resumen
+                </button>
+            </li>
+            <li>
+                <button class="sidebar-item" data-tab="tab-grabaciones" id="nav-grabaciones">
+                    <svg class="sidebar-icono" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"/>
+                    </svg>
+                    Grabaciones
+                </button>
+            </li>
+            <li>
+                <button class="sidebar-item" data-tab="tab-comandos" id="nav-comandos">
+                    <svg class="sidebar-icono" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                    </svg>
+                    Comandos
+                </button>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <button id="btn-cerrar-sesion" class="sidebar-item sidebar-salir">
+                <svg class="sidebar-icono" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/>
+                </svg>
+                Cerrar sesion
+            </button>
+        </div>
+    </nav>
+
+    <!-- Contenido principal admin -->
+    <main class="admin-main">
+
+        <!-- ============================================================== -->
+        <!-- TAB: Resumen                                                    -->
+        <!-- ============================================================== -->
+        <div id="tab-resumen" class="admin-tab activo-tab">
+            <div class="admin-cabecera">
+                <h2 class="admin-titulo-pagina">Resumen del corpus</h2>
+                <button id="btn-actualizar-stats" class="boton boton-fantasma boton-pequeno">Actualizar</button>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-tarjeta">
+                    <div class="stat-valor" id="stat-total-grabaciones">---</div>
+                    <div class="stat-etiqueta">Total de grabaciones</div>
+                </div>
+                <div class="stat-tarjeta">
+                    <div class="stat-valor" id="stat-total-participantes">---</div>
+                    <div class="stat-etiqueta">Participantes</div>
+                </div>
+                <div class="stat-tarjeta">
+                    <div class="stat-valor" id="stat-total-comandos">---</div>
+                    <div class="stat-etiqueta">Comandos activos</div>
+                </div>
+            </div>
+
+            <!-- Distribucion por comando -->
+            <div class="admin-seccion">
+                <h3 class="admin-subtitulo">Grabaciones por comando</h3>
+                <div id="grafico-comandos" class="grafico-barras"></div>
+            </div>
+
+            <!-- Distribucion por participante -->
+            <div class="admin-seccion">
+                <h3 class="admin-subtitulo">Grabaciones por participante</h3>
+                <div id="tabla-participantes" class="tabla-participantes"></div>
+            </div>
+
+            <!-- Exportacion -->
+            <div class="admin-seccion">
+                <h3 class="admin-subtitulo">Exportar metadatos</h3>
+                <div class="exportar-acciones">
+                    <button id="btn-exportar-json" class="boton boton-secundario">Descargar JSON</button>
+                    <button id="btn-exportar-csv" class="boton boton-secundario">Descargar CSV</button>
+                    <button id="btn-descargar-todo-zip" class="boton boton-primario">Descargar todos los audios (ZIP)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- TAB: Grabaciones                                               -->
+        <!-- ============================================================== -->
+        <div id="tab-grabaciones" class="admin-tab">
+            <div class="admin-cabecera">
+                <h2 class="admin-titulo-pagina">Grabaciones del corpus</h2>
+            </div>
+
+            <!-- Filtros -->
+            <div class="filtros-panel">
+                <div class="campo-grupo campo-inline">
+                    <label class="campo-etiqueta" for="filtro-alias">Participante</label>
+                    <input id="filtro-alias" type="text" class="campo-texto campo-compacto" placeholder="Alias...">
+                </div>
+                <div class="campo-grupo campo-inline">
+                    <label class="campo-etiqueta" for="filtro-comando">Comando</label>
+                    <select id="filtro-comando" class="campo-select campo-compacto">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <button id="btn-filtrar" class="boton boton-secundario">Filtrar</button>
+                <button id="btn-limpiar-filtros" class="boton boton-fantasma">Limpiar</button>
+                <button id="btn-descargar-filtro-zip" class="boton boton-primario" style="margin-left: auto;">Descargar filtrados (ZIP)</button>
+            </div>
+
+            <!-- Tabla de grabaciones -->
+            <div class="tabla-contenedor">
+                <table class="tabla-datos" id="tabla-grabaciones">
+                    <thead>
+                        <tr>
+                            <th>Participante</th>
+                            <th>Comando</th>
+                            <th>Duracion</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-grabaciones-cuerpo">
+                        <tr><td colspan="5" class="celda-cargando"><div class="spinner"></div> Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginacion -->
+            <div class="paginacion" id="paginacion">
+                <button id="btn-pag-anterior" class="boton boton-fantasma boton-pequeno" disabled>Anterior</button>
+                <span id="info-paginacion" class="paginacion-info">Pagina 1</span>
+                <button id="btn-pag-siguiente" class="boton boton-fantasma boton-pequeno">Siguiente</button>
+            </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- TAB: Comandos                                                  -->
+        <!-- ============================================================== -->
+        <div id="tab-comandos" class="admin-tab">
+            <div class="admin-cabecera">
+                <h2 class="admin-titulo-pagina">Gestion de comandos</h2>
+                <button id="btn-nuevo-comando" class="boton boton-primario boton-pequeno">Nuevo comando</button>
+            </div>
+
+            <div id="lista-comandos-admin" class="lista-comandos-admin">
+                <div class="cargando-comandos"><div class="spinner"></div> Cargando...</div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODAL: Reproductor de audio con espectrograma                          -->
+<!-- ====================================================================== -->
+<div id="modal-reproductor" class="modal-overlay oculto" role="dialog" aria-modal="true" aria-label="Reproductor de audio">
+    <div class="modal-contenido">
+        <div class="modal-cabecera">
+            <div>
+                <h3 class="modal-titulo" id="modal-titulo">Reproduciendo grabacion</h3>
+                <p class="modal-subtitulo" id="modal-subtitulo">---</p>
+            </div>
+            <button id="modal-cerrar" class="boton-icono" aria-label="Cerrar">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+            </button>
+        </div>
+
+        <audio id="audio-reproductor" controls class="reproductor-audio"></audio>
+
+        <div class="espectrograma-contenedor">
+            <div class="espectrograma-titulo">Espectrograma</div>
+            <canvas id="canvas-espectrograma-modal" class="canvas-espectrograma" width="600" height="200"></canvas>
+        </div>
+
+        <div id="modal-descriptores" class="descriptores-panel">
+            <div class="descriptor-item">
+                <span class="descriptor-nombre">HF/LF Ratio</span>
+                <span class="descriptor-valor" id="modal-desc-hflf">---</span>
+            </div>
+            <div class="descriptor-item">
+                <span class="descriptor-nombre">Energia Alta</span>
+                <span class="descriptor-valor" id="modal-desc-alta">---</span>
+            </div>
+            <div class="descriptor-item">
+                <span class="descriptor-nombre">Energia Baja</span>
+                <span class="descriptor-valor" id="modal-desc-baja">---</span>
+            </div>
+            <div class="descriptor-item">
+                <span class="descriptor-nombre">ZCR</span>
+                <span class="descriptor-valor" id="modal-desc-zcr">---</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODAL: Crear / Editar comando                                          -->
+<!-- ====================================================================== -->
+<div id="modal-comando" class="modal-overlay oculto" role="dialog" aria-modal="true" aria-label="Editar comando">
+    <div class="modal-contenido modal-pequeno">
+        <div class="modal-cabecera">
+            <h3 class="modal-titulo" id="modal-comando-titulo">Nuevo comando</h3>
+            <button id="modal-comando-cerrar" class="boton-icono" aria-label="Cerrar">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+            </button>
+        </div>
+
+        <form id="form-comando" autocomplete="off">
+            <input type="hidden" id="cmd-id">
+            <div class="campo-grupo">
+                <label class="campo-etiqueta" for="cmd-nombre">Nombre del comando</label>
+                <input id="cmd-nombre" type="text" class="campo-texto" placeholder="Ej: Adelante" required>
+            </div>
+            <div class="campo-grupo">
+                <label class="campo-etiqueta" for="cmd-descripcion">Instruccion para el participante</label>
+                <textarea id="cmd-descripcion" class="campo-textarea" rows="3" placeholder="Ej: Pronuncia la palabra Adelante en voz normal..."></textarea>
+            </div>
+            <div class="campo-grupo campo-fila">
+                <label class="campo-etiqueta" for="cmd-orden">Orden</label>
+                <input id="cmd-orden" type="number" class="campo-texto campo-compacto" value="0" min="0">
+            </div>
+            <div class="campo-grupo campo-fila campo-toggle">
+                <label class="campo-etiqueta" for="cmd-activo">Activo</label>
+                <input id="cmd-activo" type="checkbox" class="campo-checkbox" checked>
+            </div>
+            <div id="modal-comando-error" class="mensaje-error oculto"></div>
+            <div class="modal-acciones">
+                <button type="button" id="btn-cancelar-comando" class="boton boton-fantasma">Cancelar</button>
+                <button type="submit" id="btn-guardar-comando" class="boton boton-primario">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Toast de notificacion -->
+<div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+<!-- Scripts -->
+<script src="js/dsp.js"></script>
+<script src="js/espectrograma.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
