@@ -281,6 +281,64 @@ body.tema-admin {
   gap: 16px;
 }
 
+.tarjeta-cmd-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tarjeta-cmd-info h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-texto-1);
+}
+
+.tarjeta-cmd-info p {
+  font-size: 0.875rem;
+  color: var(--color-texto-2);
+  line-height: 1.5;
+}
+
+.tarjeta-cmd-acciones {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.estado-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin-top: 6px;
+  width: fit-content;
+}
+
+.estado-badge.activo {
+  background: hsl(142, 60%, 18%);
+  color: hsl(142, 70%, 60%);
+}
+
+.estado-badge.inactivo {
+  background: var(--color-superficie-2);
+  color: var(--color-texto-3);
+}
+
+/* Boton de peligro / accion destructiva */
+.boton-peligro {
+  background: hsl(0, 55%, 18%);
+  color: hsl(0, 80%, 68%);
+  border: 1px solid hsl(0, 45%, 26%);
+}
+
+.boton-peligro:hover:not(:disabled) {
+  background: hsl(0, 65%, 24%);
+  color: hsl(0, 90%, 75%);
+}
+
 /* ========================================================================
    RESPONSIVE
    ======================================================================== */
