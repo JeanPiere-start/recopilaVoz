@@ -413,3 +413,91 @@ body.tema-admin {
   color: var(--color-primario);
   font-family: var(--fuente-mono);
 }
+
+/* ========================================================================
+   MODAL CREAR EN LOTE
+   ======================================================================== */
+.modal-lote {
+  max-width: 620px;
+  width: 100%;
+}
+
+.lote-ejemplo {
+  background: var(--color-superficie-2);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-md);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+
+.lote-ejemplo-titulo {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-texto-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.lote-ejemplo-codigo {
+  font-family: var(--fuente-mono);
+  font-size: 0.8125rem;
+  color: var(--color-texto-2);
+  margin: 0;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+.lote-textarea {
+  font-family: var(--fuente-mono);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  resize: vertical;
+  min-height: 200px;
+}
+
+.lote-contador {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--color-superficie-2);
+  color: var(--color-texto-3);
+  transition: background var(--trans-rapida), color var(--trans-rapida);
+}
+
+.lote-contador.lote-contador-activo {
+  background: var(--color-primario-suave);
+  color: var(--color-primario);
+}
+
+.lote-progreso {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lote-barra-fondo {
+  width: 100%;
+  height: 6px;
+  background: var(--color-superficie-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.lote-barra-fill {
+  height: 100%;
+  background: var(--color-primario);
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+.lote-progreso-texto {
+  font-size: 0.875rem;
+  color: var(--color-texto-2);
+}
+
