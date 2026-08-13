@@ -445,6 +445,132 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================
+    // MODAL: CREAR COMANDOS EN LOTE
+    // =========================================================
+    const modalLote = document.getElementById('modal-lote');
+    const btnLoteComandos = document.getElementById('btn-lote-comandos');
+    const btnLoteCerrar = document.getElementById('modal-lote-cerrar');
+    const btnLoteCancelar = document.getElementById('btn-lote-cancelar');
+    const btnLoteCrear = document.getElementById('btn-lote-crear');
+    const loteTextarea = document.getElementById('lote-textarea');
+    const loteContador = document.getElementById('lote-contador');
+    const loteProgreso = document.getElementById('lote-progreso');
+    const loteBarraFill = document.getElementById('lote-barra-fill');
+    const loteProgresoTexto = document.getElementById('lote-progreso-texto');
+    const loteError = document.getElementById('lote-error');
+
+    function parsearLineasLote(texto) {
+        return texto
+            .split('\n')
+            .map(l => l.trim())
+            .filter(l => l.length > 0)
+            .map((l, i) => {
+                const partes = l.split('|');
+                return {
+                    nombre: partes[0].trim(),
+                    descripcion: partes[1] ? partes[1].trim() : '',
+                    orden: i,
+                    activo: true
+                };
+            })
+            .filter(c => c.nombre.length > 0);
+    }
+
+    function actualizarContadorLote() {
+        const cmds = parsearLineasLote(loteTextarea.value);
+        const n = cmds.length;
+        loteContador.textContent = n === 1 ? '1 comando' : `${n} comandos`;
+        loteContador.className = 'lote-contador' + (n > 0 ? ' lote-contador-activo' : '');
+    }
+
+    function abrirModalLote() {
+        loteTextarea.value = '';
+        loteContador.textContent = '0 comandos';
+        loteContador.className = 'lote-contador';
+        loteProgreso.classList.add('oculto');
+        loteError.classList.add('oculto');
+        btnLoteCrear.disabled = false;
+        modalLote.classList.remove('oculto');
+        loteTextarea.focus();
+    }
+
+    function cerrarModalLote() {
+        modalLote.classList.add('oculto');
+    }
+
+    if (loteTextarea) loteTextarea.addEventListener('input', actualizarContadorLote);
+    if (btnLoteComandos) btnLoteComandos.addEventListener('click', abrirModalLote);
+    if (btnLoteCerrar) btnLoteCerrar.addEventListener('click', cerrarModalLote);
+    if (btnLoteCancelar) btnLoteCancelar.addEventListener('click', cerrarModalLote);
+    window.addEventListener('click', (e) => {
+        if (e.target === modalLote) cerrarModalLote();
+    });
+
+    if (btnLoteCrear) {
+        btnLoteCrear.addEventListener('click', async () => {
+            const comandos = parsearLineasLote(loteTextarea.value);
+            if (comandos.length === 0) {
+                loteError.textContent = 'Escribe al menos un comando.';
+                loteError.classList.remove('oculto');
+                return;
+            }
+
+            loteError.classList.add('oculto');
+            loteProgreso.classList.remove('oculto');
+            btnLoteCrear.disabled = true;
+            btnLoteCancelar.disabled = true;
+
+            let creados = 0;
+            const errores = [];
+
+            for (let i = 0; i < comandos.length; i++) {
+                const cmd = comandos[i];
+                const porcentaje = Math.round(((i) / comandos.length) * 100);
+                loteBarraFill.style.width = `${porcentaje}%`;
+                loteProgresoTexto.textContent = `Creando "${cmd.nombre}"… (${i + 1} de ${comandos.length})`;
+
+                try {
+                    const res = await peticionAuth('/api/admin/comandos', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(cmd)
+                    });
+                    if (res.ok) {
+                        creados++;
+                    } else {
+                        const d = await res.json();
+                        errores.push(`"${cmd.nombre}": ${d.error || 'error desconocido'}`);
+                    }
+                } catch (err) {
+                    errores.push(`"${cmd.nombre}": error de conexion`);
+                }
+            }
+
+            loteBarraFill.style.width = '100%';
+            loteProgresoTexto.textContent = `¡Listo! ${creados} de ${comandos.length} creados.`;
+            btnLoteCancelar.disabled = false;
+
+            if (errores.length > 0) {
+                loteError.textContent = 'Errores: ' + errores.join(' | ');
+                loteError.classList.remove('oculto');
+            }
+
+            if (creados > 0) {
+                mostrarToast(`${creados} comando${creados !== 1 ? 's' : ''} creado${creados !== 1 ? 's' : ''}`, 'exito');
+                cargarComandos();
+                poblarFiltrosComandos();
+            }
+
+            // Cerrar automaticamente si todo fue exitoso
+            if (errores.length === 0) {
+                setTimeout(() => cerrarModalLote(), 1200);
+            } else {
+                btnLoteCrear.disabled = false;
+            }
+        });
+    }
+
+    // =========================================================
     // EXPORTACIONES
     // =========================================================
     if (btnExportarJson) btnExportarJson.addEventListener('click', () => descargarRuta('/api/admin/exportar?formato=json', 'export.json'));
