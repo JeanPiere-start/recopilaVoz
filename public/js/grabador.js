@@ -161,9 +161,13 @@ class Grabador {
     }
 
     /**
-     * Inicia la captura de audio.
+     * Prepara la captura de audio: activa el micrófono, el analizador (VU-meter /
+     * espectrograma en vivo) y deja el MediaRecorder listo — pero SIN empezar a
+     * capturar todavía. Esto permite mostrar la cuenta regresiva de preparación
+     * sin que el audio de esos segundos (o los beeps) quede grabado en el WAV final.
+     * Llamar a comenzarCaptura() para iniciar la grabación real.
      */
-    async iniciar() {
+    async preparar() {
         try {
             if (!this.stream || !this.stream.active) {
                 await Grabador.preCalentarMicrofono();
@@ -194,7 +198,7 @@ class Grabador {
 
             this.chunks = [];
             this.mediaRecorder = new MediaRecorder(this.stream, mimeSeleccionado ? { mimeType: mimeSeleccionado } : {});
-            
+
             this.mediaRecorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) {
                     this.chunks.push(e.data);
@@ -203,16 +207,27 @@ class Grabador {
 
             this.mediaRecorder.onstop = () => this._procesarAudio();
 
-            this.mediaRecorder.start(50); // Timeslice de 50ms para captura continua
-            if (this.onIniciar) this.onIniciar();
-
         } catch (err) {
             const mensaje = err.name === 'NotAllowedError'
                 ? 'Permiso de micrófono denegado. Habilita el acceso en los permisos de tu navegador.'
-                : `Error al iniciar grabación: ${err.message}`;
+                : `Error al preparar grabación: ${err.message}`;
             if (this.onError) this.onError(mensaje);
             throw err;
         }
+    }
+
+    /**
+     * Inicia la captura real de audio. Debe llamarse en el instante exacto en que
+     * el hablante debe empezar a hablar (p. ej. justo al terminar la cuenta
+     * regresiva de preparación), nunca antes.
+     */
+    comenzarCaptura() {
+        if (!this.mediaRecorder) {
+            throw new Error('El grabador no fue preparado. Llama a preparar() antes de comenzarCaptura().');
+        }
+        if (this.mediaRecorder.state !== 'inactive') return;
+        this.mediaRecorder.start(50); // Timeslice de 50ms para captura continua
+        if (this.onIniciar) this.onIniciar();
     }
 
     /**
