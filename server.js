@@ -87,6 +87,61 @@ let configGrabacion = {
 };
 
 /**
+ * Verifica si un código de dispositivo es el propietario legítimo de un alias.
+ * Un alias "no reclamado" (sin código guardado aún, p.ej. registros previos a esta
+ * protección) se considera libre de reclamar por el primer dispositivo que lo use.
+ * @returns {Promise<boolean>}
+ */
+async function verificarPropietarioAlias(aliasSanitizado, codigoDispositivo) {
+    if (!codigoDispositivo) return false;
+
+    if (supabase) {
+        try {
+            const { data } = await supabase
+                .from('hablantes_perfil')
+                .select('codigo_dispositivo')
+                .eq('alias', aliasSanitizado)
+                .maybeSingle();
+            if (!data || !data.codigo_dispositivo) return true;
+            return data.codigo_dispositivo === codigoDispositivo;
+        } catch (e) {
+            return true; // No bloquear por una falla transitoria de Supabase
+        }
+    }
+
+    const mem = memoriaPerfilesHablantes.get(aliasSanitizado);
+    if (!mem || !mem.codigo_dispositivo) return true;
+    return mem.codigo_dispositivo === codigoDispositivo;
+}
+
+/**
+ * Calcula el número de "toma" (repetición) siguiente para un alias+comando,
+ * y construye el nombre de archivo estándar: Hablante_toma_comando.wav
+ */
+async function generarNombreArchivo(aliasSanitizado, comando, comandoSanitizado) {
+    let tomaAnterior = 0;
+
+    if (supabase) {
+        try {
+            const { count } = await supabase
+                .from('grabaciones')
+                .select('id', { count: 'exact', head: true })
+                .eq('alias', aliasSanitizado)
+                .eq('comando', comando);
+            tomaAnterior = count || 0;
+        } catch (e) {
+            tomaAnterior = memoriaGrabaciones.filter(g => g.alias === aliasSanitizado && g.comando === comando).length;
+        }
+    } else {
+        tomaAnterior = memoriaGrabaciones.filter(g => g.alias === aliasSanitizado && g.comando === comando).length;
+    }
+
+    const toma = tomaAnterior + 1;
+    const tomaTexto = String(toma).padStart(2, '0');
+    return { toma, nombreArchivo: `${aliasSanitizado}_${tomaTexto}_${comandoSanitizado}.wav` };
+}
+
+/**
  * Genera el contenido formateado del archivo TXT de información del hablante.
  */
 function generarTextoInfoHablante(alias, perfil = {}, stats = {}) {
@@ -192,6 +247,83 @@ app.get('/api/anuncio', async (req, res) => {
 });
 
 /**
+ * POST /api/participantes/ingresar
+ * Reclama o verifica la propiedad de un alias mediante un código de dispositivo
+ * generado en el navegador del participante (guardado en localStorage).
+ * Evita que dos personas usen el mismo alias a la vez, o que alguien ajeno
+ * entre a un alias existente y sabotee (grabe encima de) sus muestras.
+ */
+app.post('/api/participantes/ingresar', async (req, res) => {
+    try {
+        const { alias, codigoDispositivo } = req.body;
+        if (!alias || typeof alias !== 'string' || !alias.trim()) {
+            return res.status(400).json({ error: 'El alias es obligatorio.' });
+        }
+        if (!codigoDispositivo || typeof codigoDispositivo !== 'string') {
+            return res.status(400).json({ error: 'Falta el código de dispositivo. Recarga la página e intenta de nuevo.' });
+        }
+
+        const aliasSanitizado = alias.trim().replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
+
+        if (supabase) {
+            try {
+                const { data: existente } = await supabase
+                    .from('hablantes_perfil')
+                    .select('alias, codigo_dispositivo')
+                    .eq('alias', aliasSanitizado)
+                    .maybeSingle();
+
+                if (!existente) {
+                    await supabase.from('hablantes_perfil').insert({
+                        alias: aliasSanitizado,
+                        codigo_dispositivo: codigoDispositivo
+                    });
+                    return res.json({ exito: true, alias: aliasSanitizado });
+                }
+
+                if (!existente.codigo_dispositivo || existente.codigo_dispositivo === codigoDispositivo) {
+                    await supabase.from('hablantes_perfil')
+                        .update({ codigo_dispositivo: codigoDispositivo })
+                        .eq('alias', aliasSanitizado);
+                    return res.json({ exito: true, alias: aliasSanitizado });
+                }
+
+                return res.status(409).json({
+                    error: `El alias "${aliasSanitizado}" ya está en uso por otro participante. Elige un alias distinto (por ejemplo, agrega tu inicial o un número).`
+                });
+            } catch (errSup) {
+                console.warn('[WARN /api/participantes/ingresar fallback a memoria]', errSup.message);
+            }
+        }
+
+        // Fallback en memoria
+        const existenteMem = memoriaPerfilesHablantes.get(aliasSanitizado);
+        if (!existenteMem) {
+            memoriaPerfilesHablantes.set(aliasSanitizado, {
+                alias: aliasSanitizado,
+                nombres_apellidos: '',
+                contacto: '',
+                notas: '',
+                codigo_dispositivo: codigoDispositivo,
+                created_at: new Date().toISOString()
+            });
+            return res.json({ exito: true, alias: aliasSanitizado });
+        }
+
+        if (!existenteMem.codigo_dispositivo || existenteMem.codigo_dispositivo === codigoDispositivo) {
+            existenteMem.codigo_dispositivo = codigoDispositivo;
+            return res.json({ exito: true, alias: aliasSanitizado });
+        }
+
+        return res.status(409).json({
+            error: `El alias "${aliasSanitizado}" ya está en uso por otro participante. Elige un alias distinto.`
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Error al verificar el alias: ' + err.message });
+    }
+});
+
+/**
  * GET /api/participantes/perfil
  * Consulta los datos de registro/contacto del hablante (alias).
  */
@@ -233,12 +365,18 @@ app.get('/api/participantes/perfil', async (req, res) => {
  */
 app.post('/api/participantes/perfil', async (req, res) => {
     try {
-        const { alias, nombres_apellidos = '', contacto = '', notas = '' } = req.body;
+        const { alias, nombres_apellidos = '', contacto = '', notas = '', codigoDispositivo = '' } = req.body;
         if (!alias || typeof alias !== 'string') {
             return res.status(400).json({ error: 'Alias inválido o no proporcionado.' });
         }
 
         const aliasSanitizado = alias.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
+
+        const esPropietario = await verificarPropietarioAlias(aliasSanitizado, codigoDispositivo);
+        if (!esPropietario) {
+            return res.status(403).json({ error: `El alias "${aliasSanitizado}" pertenece a otro participante.` });
+        }
+
         const perfilObj = {
             alias: aliasSanitizado,
             nombres_apellidos: (nombres_apellidos || '').trim().substring(0, 150),
@@ -338,7 +476,7 @@ app.get('/api/comandos', async (req, res) => {
  */
 app.post('/api/grabar', almacenMulter.single('audio'), async (req, res) => {
     try {
-        const { alias, comando, duracion_s } = req.body;
+        const { alias, comando, duracion_s, codigoDispositivo = '' } = req.body;
 
         if (!alias || !comando) {
             return res.status(400).json({ error: 'El alias y el comando son campos obligatorios.' });
@@ -349,9 +487,19 @@ app.post('/api/grabar', almacenMulter.single('audio'), async (req, res) => {
 
         const aliasSanitizado = alias.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
         const comandoSanitizado = comando.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
+
+        // Protección anti-suplantación/boicot: solo el dueño del alias puede subir grabaciones
+        const esPropietario = await verificarPropietarioAlias(aliasSanitizado, codigoDispositivo);
+        if (!esPropietario) {
+            return res.status(403).json({ error: `No puedes grabar con el alias "${aliasSanitizado}" porque pertenece a otro participante.` });
+        }
+
         const timestamp = Date.now();
-        const rutaStorage = `${aliasSanitizado}/${comandoSanitizado}_${timestamp}.wav`;
         const duracionFloat = parseFloat(duracion_s) || configGrabacion.duracion_s;
+
+        // Etiquetado estándar: Hablante_toma_comando.wav
+        const { nombreArchivo } = await generarNombreArchivo(aliasSanitizado, comando, comandoSanitizado);
+        const rutaStorage = `${aliasSanitizado}/${nombreArchivo}`;
 
         if (supabase) {
             try {
@@ -370,19 +518,31 @@ app.post('/api/grabar', almacenMulter.single('audio'), async (req, res) => {
                         .createSignedUrl(rutaStorage, 365 * 24 * 60 * 60);
 
                     // 3. Registrar metadatos en la tabla grabaciones
-                    const { data: grabacion, error: errorDB } = await supabase
+                    const payloadGrabacion = {
+                        alias: aliasSanitizado,
+                        comando: comando,
+                        url_audio: urlData ? urlData.signedUrl : '',
+                        ruta_storage: rutaStorage,
+                        nombre_archivo: nombreArchivo,
+                        tasa_hz: configGrabacion.tasa_hz,
+                        duracion_s: duracionFloat,
+                        valido: null // Inicialmente sin revisar
+                    };
+
+                    let { data: grabacion, error: errorDB } = await supabase
                         .from('grabaciones')
-                        .insert({
-                            alias: aliasSanitizado,
-                            comando: comando,
-                            url_audio: urlData ? urlData.signedUrl : '',
-                            ruta_storage: rutaStorage,
-                            tasa_hz: configGrabacion.tasa_hz,
-                            duracion_s: duracionFloat,
-                            valido: null // Inicialmente sin revisar
-                        })
+                        .insert(payloadGrabacion)
                         .select()
                         .single();
+
+                    if (errorDB && errorDB.message && errorDB.message.includes('nombre_archivo')) {
+                        // Migración de nombre_archivo aún no aplicada en Supabase: reintentar sin ella
+                        delete payloadGrabacion.nombre_archivo;
+                        const retry = await supabase.from('grabaciones').insert(payloadGrabacion).select().single();
+                        if (!retry.error && retry.data) {
+                            return res.json({ exito: true, grabacion: { ...retry.data, nombre_archivo: nombreArchivo } });
+                        }
+                    }
 
                     if (!errorDB && grabacion) {
                         return res.json({ exito: true, grabacion });
@@ -403,6 +563,7 @@ app.post('/api/grabar', almacenMulter.single('audio'), async (req, res) => {
             comando: comando,
             url_audio: dataUri,
             ruta_storage: rutaStorage,
+            nombre_archivo: nombreArchivo,
             tasa_hz: configGrabacion.tasa_hz,
             duracion_s: duracionFloat,
             valido: null,
@@ -420,6 +581,7 @@ app.post('/api/grabar', almacenMulter.single('audio'), async (req, res) => {
                 alias: nuevaGrab.alias,
                 comando: nuevaGrab.comando,
                 url_audio: nuevaGrab.url_audio,
+                nombre_archivo: nuevaGrab.nombre_archivo,
                 tasa_hz: nuevaGrab.tasa_hz,
                 duracion_s: nuevaGrab.duracion_s,
                 valido: nuevaGrab.valido,
@@ -438,18 +600,23 @@ app.post('/api/grabar', almacenMulter.single('audio'), async (req, res) => {
  */
 app.get('/api/mis-audios', async (req, res) => {
     try {
-        const { alias } = req.query;
+        const { alias, codigoDispositivo = '' } = req.query;
         if (!alias) {
             return res.status(400).json({ error: 'El parámetro alias es obligatorio.' });
         }
 
         const aliasSanitizado = alias.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
 
+        const esPropietario = await verificarPropietarioAlias(aliasSanitizado, codigoDispositivo);
+        if (!esPropietario) {
+            return res.status(403).json({ error: `El alias "${aliasSanitizado}" pertenece a otro participante.` });
+        }
+
         if (supabase) {
             try {
                 const { data, error } = await supabase
                     .from('grabaciones')
-                    .select('id, alias, comando, url_audio, tasa_hz, duracion_s, valido, created_at')
+                    .select('id, alias, comando, url_audio, nombre_archivo, tasa_hz, duracion_s, valido, created_at')
                     .eq('alias', aliasSanitizado)
                     .order('created_at', { ascending: false });
 
@@ -869,7 +1036,7 @@ app.get('/api/admin/hablantes/:alias', verificarAdmin, async (req, res) => {
             try {
                 const { data: dataGrabs, error: errGrabs } = await supabase
                     .from('grabaciones')
-                    .select('id, alias, comando, url_audio, ruta_storage, tasa_hz, duracion_s, valido, created_at')
+                    .select('id, alias, comando, url_audio, ruta_storage, nombre_archivo, tasa_hz, duracion_s, valido, created_at')
                     .eq('alias', aliasSanitizado)
                     .order('created_at', { ascending: false });
 
@@ -1092,7 +1259,7 @@ app.get('/api/admin/audios', verificarAdmin, async (req, res) => {
             try {
                 let consulta = supabase
                     .from('grabaciones')
-                    .select('id, alias, comando, url_audio, ruta_storage, tasa_hz, duracion_s, valido, created_at', { count: 'exact' });
+                    .select('id, alias, comando, url_audio, ruta_storage, nombre_archivo, tasa_hz, duracion_s, valido, created_at', { count: 'exact' });
 
                 if (alias) consulta = consulta.ilike('alias', `%${alias}%`);
                 if (comando) consulta = consulta.eq('comando', comando);
@@ -1752,7 +1919,7 @@ app.get('/api/admin/exportar', verificarAdmin, async (req, res) => {
             try {
                 let consulta = supabase
                     .from('grabaciones')
-                    .select('id, alias, comando, tasa_hz, duracion_s, valido, created_at, url_audio')
+                    .select('id, alias, comando, tasa_hz, duracion_s, valido, created_at, url_audio, nombre_archivo')
                     .order('created_at', { ascending: false });
 
                 if (valido === 'true') consulta = consulta.eq('valido', true);
@@ -1804,7 +1971,7 @@ app.get('/api/admin/descargar-zip', verificarAdmin, async (req, res) => {
             try {
                 let consulta = supabase
                     .from('grabaciones')
-                    .select('id, alias, comando, tasa_hz, duracion_s, valido, created_at, ruta_storage, url_audio');
+                    .select('id, alias, comando, tasa_hz, duracion_s, valido, created_at, ruta_storage, url_audio, nombre_archivo');
 
                 if (ids) {
                     const arrayIds = ids.split(',').map(x => x.trim()).filter(x => x);
@@ -1838,6 +2005,14 @@ app.get('/api/admin/descargar-zip', verificarAdmin, async (req, res) => {
         const zip = archiver('zip', { zlib: { level: 6 } });
         zip.pipe(res);
 
+        // Nombre de archivo estándar Hablante_toma_comando.wav; con respaldo para
+        // grabaciones creadas antes de que existiera la columna nombre_archivo.
+        const nombreArchivoDe = (g) => {
+            if (g.nombre_archivo) return g.nombre_archivo;
+            const comandoSanitizado = (g.comando || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+            return `${g.alias}_00_${comandoSanitizado}.wav`;
+        };
+
         // Generar manifiesto JSON interno
         const manifiesto = {
             proyecto: 'RecopilaVoz — Experimento de Separabilidad Espectral H7',
@@ -1850,7 +2025,7 @@ app.get('/api/admin/descargar-zip', verificarAdmin, async (req, res) => {
                 duracion_s: g.duracion_s,
                 tasa_hz: g.tasa_hz || 16000,
                 valido: g.valido,
-                archivo_relativo: `${g.alias}/${g.comando}_${new Date(g.created_at).getTime()}.wav`
+                archivo_relativo: `${g.alias}/${nombreArchivoDe(g)}`
             }))
         };
         zip.append(JSON.stringify(manifiesto, null, 2), { name: 'manifest.json' });
@@ -1858,7 +2033,7 @@ app.get('/api/admin/descargar-zip', verificarAdmin, async (req, res) => {
         // Generar metadata.csv interno
         const csvHeader = 'id,alias,comando,duracion_s,tasa_hz,valido,fecha,ruta_archivo';
         const csvRows = lista.map(g =>
-            `"${g.id}","${g.alias}","${g.comando}",${g.duracion_s || ''},${g.tasa_hz || 16000},${g.valido === null ? 'sin_revisar' : (g.valido ? 'valido' : 'rechazado')},"${g.created_at}","${g.alias}/${g.comando}_${new Date(g.created_at).getTime()}.wav"`
+            `"${g.id}","${g.alias}","${g.comando}",${g.duracion_s || ''},${g.tasa_hz || 16000},${g.valido === null ? 'sin_revisar' : (g.valido ? 'valido' : 'rechazado')},"${g.created_at}","${g.alias}/${nombreArchivoDe(g)}"`
         );
         zip.append([csvHeader, ...csvRows].join('\n'), { name: 'metadatos.csv' });
 
@@ -1935,8 +2110,7 @@ app.get('/api/admin/descargar-zip', verificarAdmin, async (req, res) => {
             }
 
             if (bufferAudio) {
-                const timestampGrab = new Date(grab.created_at).getTime();
-                const rutaEnZip = `${grab.alias}/${grab.comando}_${timestampGrab}.wav`;
+                const rutaEnZip = `${grab.alias}/${nombreArchivoDe(grab)}`;
                 zip.append(bufferAudio, { name: rutaEnZip });
             }
         }
