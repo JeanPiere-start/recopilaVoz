@@ -1,0 +1,610 @@
+/*
+ * participante.css — Estilos para la vista de participante de RecopilaVoz
+ */
+
+/* ========================================================================
+   INGRESO
+   ======================================================================== */
+.ingreso-contenedor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.ingreso-marca {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.ingreso-marca .marca-icono {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radio-md);
+  background: var(--color-primario);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ingreso-tarjeta {
+  background: var(--color-superficie-1);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-xl);
+  box-shadow: var(--sombra-lg);
+  padding: 36px;
+  width: 100%;
+  max-width: 440px;
+}
+
+.ingreso-titulo {
+  font-size: 1.35rem;
+  margin-bottom: 8px;
+}
+
+.ingreso-descripcion {
+  color: var(--color-texto-2);
+  font-size: 0.9rem;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.ingreso-nota {
+  color: var(--color-texto-3);
+  font-size: 0.8rem;
+  margin-top: 18px;
+  text-align: center;
+}
+
+/* ========================================================================
+   ENCABEZADO
+   ======================================================================== */
+.encabezado {
+  background: var(--color-superficie-1);
+  border-bottom: 1px solid var(--color-borde);
+  padding: 14px 24px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.encabezado-interior {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.encabezado-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.encabezado-logo {
+  border-radius: var(--radio-sm);
+  height: 32px;
+  width: 32px;
+  background: var(--color-primario);
+  color: #ffffff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
+.encabezado-nombre {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.encabezado-usuario {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.etiqueta-alias {
+  background: var(--color-superficie-3);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-md);
+  color: var(--color-texto-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  font-family: var(--fuente-mono);
+}
+
+/* ========================================================================
+   CONTENIDO PRINCIPAL
+   ======================================================================== */
+.contenido-principal {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 24px;
+  flex: 1;
+  width: 100%;
+}
+
+.diseno-dos-columnas {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 28px;
+  margin-bottom: 32px;
+}
+
+.columna-comandos {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.columna-grabacion {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ========================================================================
+   PROGRESO & LISTA DE COMANDOS
+   ======================================================================== */
+.progreso-contenedor {
+  background: var(--color-superficie-1);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-md);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.progreso-texto {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+  color: var(--color-texto-2);
+  font-family: var(--fuente-mono);
+  font-weight: 600;
+}
+
+.progreso-barra-fondo {
+  background: var(--color-superficie-3);
+  border-radius: 999px;
+  height: 7px;
+  overflow: hidden;
+}
+
+.progreso-barra-relleno {
+  background: var(--color-valido);
+  height: 100%;
+  width: 0%;
+  transition: width var(--trans-normal);
+}
+
+.lista-comandos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.cargando-comandos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: var(--color-texto-3);
+  font-size: 0.9rem;
+}
+
+.item-comando {
+  background: var(--color-superficie-1);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-md);
+  padding: 12px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all var(--trans-rapida);
+}
+
+.item-comando:hover {
+  background: var(--color-superficie-2);
+  border-color: var(--color-primario);
+  transform: translateX(2px);
+}
+
+.item-comando.activo {
+  border-color: var(--color-primario);
+  border-left: 4px solid var(--color-primario);
+  background: var(--color-superficie-2);
+}
+
+.item-comando.completado {
+  border-left: 4px solid var(--color-valido);
+}
+
+.cmd-nombre-texto {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.cmd-conteo-badge {
+  font-family: var(--fuente-mono);
+  font-size: 0.78rem;
+  background: var(--color-superficie-3);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-sm);
+  padding: 2px 8px;
+  color: var(--color-texto-2);
+}
+
+.item-comando.activo .cmd-conteo-badge {
+  color: var(--color-primario);
+  border-color: var(--color-primario-suave);
+}
+
+.item-comando.completado .cmd-conteo-badge {
+  color: var(--color-valido);
+  border-color: var(--color-valido-suave);
+}
+
+/* ========================================================================
+   PANELES DE GRABACIÓN
+   ======================================================================== */
+.panel-vacio {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-superficie-1);
+  border: 1px dashed var(--color-borde);
+  border-radius: var(--radio-xl);
+  padding: 60px 24px;
+  text-align: center;
+  min-height: 420px;
+}
+
+.panel-vacio.activo-panel {
+  display: flex;
+}
+
+.panel-vacio-icono {
+  margin-bottom: 16px;
+  color: var(--color-texto-3);
+}
+
+.panel-vacio-texto {
+  color: var(--color-texto-2);
+  max-width: 320px;
+  font-size: 0.95rem;
+}
+
+.panel-grabacion {
+  display: none;
+  background: var(--color-superficie-1);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-xl);
+  padding: 28px 32px;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.panel-grabacion.activo-panel {
+  display: flex;
+  animation: fadeIn var(--trans-normal);
+}
+
+.grabacion-cabecera {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.grabacion-comando-badge {
+  background: var(--color-superficie-3);
+  color: var(--color-texto-1);
+  padding: 5px 16px;
+  border-radius: 999px;
+  font-family: var(--fuente-mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: 1px solid var(--color-borde);
+}
+
+.estado-etiqueta {
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radio-sm);
+  font-family: var(--fuente-mono);
+}
+
+.estado-listo { background: var(--color-superficie-3); color: var(--color-texto-2); }
+.estado-grabando { background: var(--color-grabar); color: #fff; animation: pulse 1.5s infinite; }
+
+.grabacion-instruccion {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 24px;
+  line-height: 1.3;
+  color: var(--color-texto-1);
+  max-width: 560px;
+}
+
+/* ========================================================================
+   ESPECTROGRAMA & VU METER
+   ======================================================================== */
+.espectrograma-contenedor {
+  width: 100%;
+  max-width: 600px;
+  background: #080b12;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-md);
+  padding: 10px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.espectrograma-titulo {
+  font-size: 0.75rem;
+  color: var(--color-texto-3);
+  font-family: var(--fuente-mono);
+  text-align: left;
+}
+
+.canvas-espectrograma {
+  width: 100%;
+  height: 160px;
+  display: block;
+  border-radius: var(--radio-sm);
+}
+
+.canvas-resultado {
+  height: 180px;
+}
+
+.espectrograma-leyenda {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--color-texto-3);
+  font-family: var(--fuente-mono);
+}
+
+.vu-meter-contenedor {
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 20px;
+}
+
+.vu-meter-fondo {
+  background: var(--color-superficie-3);
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.vu-meter-barra {
+  background: linear-gradient(90deg, var(--color-valido) 0%, var(--color-pendiente) 70%, var(--color-rechazado) 100%);
+  height: 100%;
+  width: 0%;
+  transition: width 50ms linear;
+}
+
+.vu-meter-etiqueta {
+  font-size: 0.75rem;
+  color: var(--color-texto-3);
+  margin-top: 6px;
+  font-family: var(--fuente-mono);
+}
+
+.controles-grabacion {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.boton-grabar {
+  background: var(--color-grabar);
+  color: #ffffff;
+  padding: 0.65em 1.6em;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.boton-grabar:hover:not(:disabled) {
+  background: var(--color-grabar-hover);
+  box-shadow: 0 4px 14px hsl(0, 72%, 52% / 0.4);
+}
+
+.boton-grabar-punto {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: inline-block;
+}
+
+.boton-detener {
+  background: var(--color-superficie-3);
+  color: var(--color-texto-1);
+}
+
+/* ========================================================================
+   TEMPORIZADOR & RESULTADO
+   ======================================================================== */
+.temporizador {
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 20px;
+}
+
+.temporizador-barra {
+  background: var(--color-primario);
+  height: 5px;
+  border-radius: 999px;
+  width: 0%;
+  margin-bottom: 6px;
+}
+
+#temporizador-texto {
+  font-size: 0.85rem;
+  color: var(--color-texto-2);
+  font-family: var(--fuente-mono);
+}
+
+.panel-resultado {
+  background: var(--color-superficie-2);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-lg);
+  padding: 22px;
+  width: 100%;
+  max-width: 600px;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.resultado-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.resultado-titulo {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.resultado-duracion {
+  font-size: 0.82rem;
+  color: var(--color-texto-2);
+  font-family: var(--fuente-mono);
+}
+
+.resultado-acciones {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cargando-subida {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--color-primario);
+  padding: 12px;
+}
+
+/* ========================================================================
+   MIS GRABACIONES
+   ======================================================================== */
+.mis-grabaciones {
+  background: var(--color-superficie-1);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-xl);
+  padding: 24px 28px;
+}
+
+.mis-grabaciones-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.lista-mis-grabaciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.tarjeta-grabacion {
+  background: var(--color-superficie-2);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tarjeta-grabacion-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tarjeta-grabacion-info h4 {
+  font-size: 1rem;
+  color: var(--color-texto-1);
+}
+
+.tarjeta-grabacion-info p {
+  font-size: 0.8rem;
+  color: var(--color-texto-3);
+  font-family: var(--fuente-mono);
+}
+
+.tarjeta-grabacion audio {
+  width: 100%;
+  height: 36px;
+  accent-color: var(--color-primario);
+}
+
+.lista-vacia {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--color-texto-3);
+  padding: 32px;
+  font-size: 0.9rem;
+}
+
+.pie-pagina {
+  text-align: center;
+  padding: 24px;
+  color: var(--color-texto-3);
+  font-size: 0.82rem;
+}
+
+/* ========================================================================
+   RESPONSIVE
+   ======================================================================== */
+@media (max-width: 900px) {
+  .diseno-dos-columnas {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .contenido-principal {
+    padding: 16px;
+  }
+  .panel-grabacion {
+    padding: 20px 16px;
+  }
+  .grabacion-instruccion {
+    font-size: 1.25rem;
+  }
+  .resultado-acciones {
+    flex-direction: column;
+  }
+}

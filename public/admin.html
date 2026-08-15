@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración | RecopilaVoz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="tema-admin">
+
+    <!-- =================================================================== -->
+    <!-- PANTALLA 1: AUTENTICACIÓN ADMIN                                     -->
+    <!-- =================================================================== -->
+    <main id="pantalla-auth" class="pantalla activa">
+        <div class="auth-contenedor">
+            <div class="auth-tarjeta">
+                <div class="auth-marca">
+                    <div class="marca-icono-admin">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                            <line x1="12" x2="12" y1="19" y2="22"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="marca-nombre">Admin Panel</h1>
+                        <p class="marca-subtitulo">RecopilaVoz • Control Espectral</p>
+                    </div>
+                </div>
+
+                <h2 class="auth-titulo">Acceso de Administrador</h2>
+                <p class="auth-descripcion">Ingresa cualquiera de los tokens autorizados en <code>ADMIN_TOKENS</code>.</p>
+
+                <form id="form-auth" onsubmit="adminApp.iniciarSesion(event)">
+                    <div class="campo-grupo">
+                        <label class="campo-etiqueta" for="input-token">Token de Acceso</label>
+                        <input type="password" id="input-token" class="campo-texto" placeholder="••••••••••••" required autofocus autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="boton boton-primario boton-bloque" style="margin-top: 14px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                            <polyline points="10 17 15 12 10 7"></polyline>
+                            <line x1="15" x2="3" y1="12" y2="12"></line>
+                        </svg>
+                        Iniciar Sesión
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <!-- =================================================================== -->
+    <!-- PANTALLA 2: PANEL PRINCIPAL ADMINISTRADOR                           -->
+    <!-- =================================================================== -->
+    <div id="pantalla-admin" class="pantalla">
+        
+        <!-- SIDEBAR DE NAVEGACIÓN -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-marca">
+                <div class="sidebar-logo-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" x2="12" y1="19" y2="22"></line>
+                    </svg>
+                </div>
+                <div>
+                    <h2>RecopilaVoz</h2>
+                    <span class="sidebar-rol-tag" id="sidebar-rol-badge">Admin</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-menu">
+                <div class="sidebar-item activo" onclick="adminApp.cambiarTab('resumen')">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="3" x2="21" y1="9" y2="9"></line>
+                            <line x1="9" x2="9" y1="21" y2="9"></line>
+                        </svg>
+                    </div>
+                    <span>Dashboard</span>
+                </div>
+                <div class="sidebar-item" onclick="adminApp.cambiarTab('grabaciones')">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        </svg>
+                    </div>
+                    <span>Grabaciones</span>
+                </div>
+                <div class="sidebar-item" onclick="adminApp.cambiarTab('comandos')">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="8" x2="21" y1="6" y2="6"></line>
+                            <line x1="8" x2="21" y1="12" y2="12"></line>
+                            <line x1="8" x2="21" y1="18" y2="18"></line>
+                            <line x1="3" x2="3.01" y1="6" y2="6"></line>
+                            <line x1="3" x2="3.01" y1="12" y2="12"></line>
+                            <line x1="3" x2="3.01" y1="18" y2="18"></line>
+                        </svg>
+                    </div>
+                    <span>Comandos</span>
+                </div>
+                <div class="sidebar-item" onclick="adminApp.cambiarTab('admins')">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                    </div>
+                    <span>Admins</span>
+                </div>
+                <div class="sidebar-item" onclick="adminApp.cambiarTab('configuracion')">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="4" x2="20" y1="21" y2="21"></line>
+                            <line x1="4" x2="20" y1="3" y2="3"></line>
+                            <line x1="4" x2="20" y1="12" y2="12"></line>
+                            <circle cx="9" cy="12" r="3"></circle>
+                            <circle cx="15" cy="21" r="3"></circle>
+                            <circle cx="15" cy="3" r="3"></circle>
+                        </svg>
+                    </div>
+                    <span>Configuración</span>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="boton sidebar-item sidebar-salir" onclick="adminApp.cerrarSesion()">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" x2="9" y1="12" y2="12"></line>
+                        </svg>
+                    </div>
+                    <span>Cerrar Sesión</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="admin-main">
+            
+            <!-- =============================================================== -->
+            <!-- TAB 1: RESUMEN / DASHBOARD                                      -->
+            <!-- =============================================================== -->
+            <section id="tab-resumen" class="admin-tab activo-tab">
+                <div class="admin-cabecera">
+                    <div>
+                        <h2 class="admin-titulo-pagina">Dashboard General</h2>
+                        <p class="admin-subtitulo">Monitoreo en tiempo real del corpus de voz para el experimento H7</p>
+                    </div>
+                    <button class="boton boton-secundario" onclick="adminApp.cargarStats()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Actualizar Métricas
+                    </button>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-tarjeta">
+                        <div class="stat-icono"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path></svg></div>
+                        <span class="stat-etiqueta">Total Grabaciones</span>
+                        <span class="stat-valor" id="stat-total-grabaciones">-</span>
+                        <span class="stat-subtexto" id="stat-subtexto-duracion">0s de audio acumulado</span>
+                    </div>
+                    <div class="stat-tarjeta stat-validados">
+                        <div class="stat-icono"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
+                        <span class="stat-etiqueta">Validadas (✓)</span>
+                        <span class="stat-valor" id="stat-validados">-</span>
+                        <span class="stat-subtexto" id="stat-tasa-aprobacion">0% tasa de aprobación</span>
+                    </div>
+                    <div class="stat-tarjeta stat-rechazados">
+                        <div class="stat-icono"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></div>
+                        <span class="stat-etiqueta">Rechazadas (✗)</span>
+                        <span class="stat-valor" id="stat-rechazados">-</span>
+                        <span class="stat-subtexto">Muestras descartadas</span>
+                    </div>
+                    <div class="stat-tarjeta stat-pendientes">
+                        <div class="stat-icono"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+                        <span class="stat-etiqueta">Sin Revisar (?)</span>
+                        <span class="stat-valor" id="stat-pendientes">-</span>
+                        <span class="stat-subtexto">Pendientes de escucha</span>
+                    </div>
+                    <div class="stat-tarjeta">
+                        <div class="stat-icono"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg></div>
+                        <span class="stat-etiqueta">Participantes</span>
+                        <span class="stat-valor" id="stat-participantes">-</span>
+                        <span class="stat-subtexto" id="stat-promedio-part">0 muestras / persona</span>
+                    </div>
+                </div>
+
+                <!-- Desgloses visuales -->
+                <div class="dashboard-desglose-grid">
+                    <div class="panel-desglose">
+                        <div class="panel-desglose-header">
+                            <h3 class="panel-desglose-titulo">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                                </svg>
+                                Balance de Muestras por Comando
+                            </h3>
+                            <span class="badge badge-primario" id="meta-comando-badge">Meta: 40</span>
+                        </div>
+                        <p class="panel-desglose-desc">Haz clic en un comando para ver y auditar sus grabaciones</p>
+                        <div id="desglose-comandos" class="desglose-lista">
+                            <div class="spinner-inline"><div class="spinner spinner-pequeno"></div> Cargando balance de comandos...</div>
+                        </div>
+                    </div>
+
+                    <div class="panel-desglose">
+                        <div class="panel-desglose-header">
+                            <h3 class="panel-desglose-titulo">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <polyline points="16 11 18 13 22 9"></polyline>
+                                </svg>
+                                Actividad por Participante
+                            </h3>
+                        </div>
+                        <p class="panel-desglose-desc">Haz clic en un participante para filtrar sus audios</p>
+                        <div id="desglose-participantes" class="desglose-lista">
+                            <div class="spinner-inline"><div class="spinner spinner-pequeno"></div> Cargando participantes...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =============================================================== -->
+            <!-- TAB 2: GRABACIONES / AUDIOS                                     -->
+            <!-- =============================================================== -->
+            <section id="tab-grabaciones" class="admin-tab">
+                <div class="admin-cabecera">
+                    <div>
+                        <h2 class="admin-titulo-pagina">Audios Recolectados</h2>
+                        <p class="admin-subtitulo">Escucha, analiza el espectrograma STFT y valida las muestras para el dataset</p>
+                    </div>
+                    <div class="exportar-acciones">
+                        <button class="boton boton-secundario" onclick="adminApp.exportarDatos('csv')">Exportar CSV</button>
+                        <button class="boton boton-secundario" onclick="adminApp.exportarDatos('json')">Exportar JSON</button>
+                        <button class="boton boton-valido" onclick="adminApp.descargarZipValidos()" title="Descargar únicamente audios validados">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            ZIP (Solo Válidos)
+                        </button>
+                        <button class="boton boton-primario" onclick="adminApp.descargarZip()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" x2="12" y1="15" y2="3"></line>
+                            </svg>
+                            Descargar Todo (ZIP)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Panel de Filtros -->
+                <div class="filtros-panel">
+                    <div class="campo-grupo campo-compacto" style="min-width: 170px;">
+                        <label class="campo-etiqueta" for="filtro-alias">Buscar Alias</label>
+                        <input type="text" id="filtro-alias" class="campo-texto" placeholder="Ej: Hablante_A" onkeyup="if(event.key==='Enter') adminApp.aplicarFiltrosGrabaciones()">
+                    </div>
+                    <div class="campo-grupo campo-compacto" style="min-width: 170px;">
+                        <label class="campo-etiqueta" for="filtro-comando">Filtrar Comando</label>
+                        <select id="filtro-comando" class="campo-select" onchange="adminApp.aplicarFiltrosGrabaciones()">
+                            <option value="">Todos los comandos</option>
+                        </select>
+                    </div>
+                    <div class="campo-grupo campo-compacto" style="min-width: 160px;">
+                        <label class="campo-etiqueta" for="filtro-estado">Estado de Validación</label>
+                        <select id="filtro-estado" class="campo-select" onchange="adminApp.aplicarFiltrosGrabaciones()">
+                            <option value="">Todos los estados</option>
+                            <option value="null">Sin Revisar (?)</option>
+                            <option value="true">Válidos (✓)</option>
+                            <option value="false">Rechazados (✗)</option>
+                        </select>
+                    </div>
+                    <div class="campo-grupo campo-compacto" style="min-width: 160px;">
+                        <label class="campo-etiqueta" for="filtro-orden">Ordenar por</label>
+                        <select id="filtro-orden" class="campo-select" onchange="adminApp.aplicarFiltrosGrabaciones()">
+                            <option value="fecha_desc">Más recientes primero</option>
+                            <option value="fecha_asc">Más antiguos primero</option>
+                            <option value="duracion_desc">Mayor duración</option>
+                            <option value="alias_asc">Alias (A-Z)</option>
+                        </select>
+                    </div>
+                    <div class="campo-grupo campo-compacto" style="align-self: flex-end; display: flex; gap: 8px;">
+                        <button class="boton boton-primario" onclick="adminApp.aplicarFiltrosGrabaciones()">Filtrar</button>
+                        <button class="boton boton-fantasma" onclick="adminApp.limpiarFiltrosGrabaciones()">Limpiar</button>
+                    </div>
+                    <div class="conteo-resultados" id="conteo-resultados-grabaciones">
+                        Cargando grabaciones...
+                    </div>
+                </div>
+
+                <!-- Tabla de Grabaciones -->
+                <div class="tabla-contenedor">
+                    <table class="tabla-datos">
+                        <thead>
+                            <tr>
+                                <th style="width: 44px; text-align: center;">
+                                    <input type="checkbox" id="check-todas-grabaciones" class="campo-checkbox" onchange="adminApp.toggleSeleccionTodasGrabaciones(event)" title="Seleccionar todas las visibles">
+                                </th>
+                                <th>Participante</th>
+                                <th>Comando</th>
+                                <th>Duración</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th style="text-align: right;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-grabaciones">
+                            <!-- Filas dinámicas generadas por admin.js -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginación -->
+                <div class="paginacion-barra" id="paginacion-contenedor"></div>
+            </section>
+
+            <!-- =============================================================== -->
+            <!-- TAB 3: COMANDOS                                                 -->
+            <!-- =============================================================== -->
+            <section id="tab-comandos" class="admin-tab">
+                <div class="admin-cabecera">
+                    <div>
+                        <h2 class="admin-titulo-pagina">Gestión de Comandos</h2>
+                        <p class="admin-subtitulo">Define el vocabulario y las palabras que los participantes deben grabar</p>
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="boton boton-secundario" onclick="adminApp.abrirModalLote()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
+                                <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+                            </svg>
+                            Crear en Lote
+                        </button>
+                        <button class="boton boton-primario" onclick="adminApp.abrirModalComando()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Nuevo Comando
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Barra de selección en lote para comandos -->
+                <div class="barra-acciones-comandos" id="acciones-lote-comandos" style="display: none;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <input type="checkbox" id="check-todos-comandos" class="campo-checkbox" onchange="adminApp.toggleSeleccionTodosComandos(event)">
+                        <span id="texto-seleccion-comandos" style="font-weight: 600;">0 comandos seleccionados</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="boton boton-pequeno boton-peligro" onclick="adminApp.eliminarComandosSeleccionados()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            Eliminar Seleccionados
+                        </button>
+                    </div>
+                </div>
+
+                <div class="lista-comandos-admin" id="lista-comandos">
+                    <!-- Tarjetas dinámicas generadas por admin.js -->
+                </div>
+            </section>
+
+            <!-- =============================================================== -->
+            <!-- TAB 4: MULTI-ADMIN                                              -->
+            <!-- =============================================================== -->
+            <section id="tab-admins" class="admin-tab">
+                <div class="admin-cabecera">
+                    <div>
+                        <h2 class="admin-titulo-pagina">Multi-Administrador</h2>
+                        <p class="admin-subtitulo">Tokens de administración y control de acceso jerárquico configurados</p>
+                    </div>
+                </div>
+
+                <div class="info-box-admin">
+                    <div class="info-box-icono">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <strong>Configuración de Múltiples Administradores:</strong>
+                        <p>Los administradores se definen en la variable de entorno <code>ADMIN_TOKENS</code> separados por comas en tu servidor o Render (ejemplo: <code>ADMIN_TOKENS=clave_super,clave_admin2,clave_admin3</code>). El <strong>1er token</strong> tiene rango de <strong>Super Administrador</strong>.</p>
+                    </div>
+                </div>
+
+                <div class="lista-admins" id="lista-admins">
+                    <!-- Dinámico -->
+                </div>
+            </section>
+
+            <!-- =============================================================== -->
+            <!-- TAB 5: CONFIGURACIÓN GLOBAL                                     -->
+            <!-- =============================================================== -->
+            <section id="tab-configuracion" class="admin-tab">
+                <div class="admin-cabecera">
+                    <div>
+                        <h2 class="admin-titulo-pagina">Configuración de Grabación</h2>
+                        <p class="admin-subtitulo">Parámetros del motor de audio y metas de recolección para los participantes</p>
+                    </div>
+                </div>
+
+                <div class="panel-configuracion-card">
+                    <form id="form-config-audio" onsubmit="adminApp.guardarConfiguracionAudio(event)">
+                        <div class="config-form-grid">
+                            <div class="campo-grupo">
+                                <label class="campo-etiqueta" for="conf-duracion">Duración de Grabación por Muestra</label>
+                                <select id="conf-duracion" class="campo-select">
+                                    <option value="1">1 segundo (Palabras muy cortas)</option>
+                                    <option value="2">2 segundos (Estándar controlVoz)</option>
+                                    <option value="3" selected>3 segundos (Recomendado para habla natural)</option>
+                                    <option value="4">4 segundos (Frases compuestas)</option>
+                                    <option value="5">5 segundos (Oraciones)</option>
+                                </select>
+                                <span class="campo-ayuda">Tiempo que el participante grabará cada vez que pulse "Grabar".</span>
+                            </div>
+
+                            <div class="campo-grupo">
+                                <label class="campo-etiqueta" for="conf-tasa">Frecuencia de Muestreo (Fs)</label>
+                                <select id="conf-tasa" class="campo-select">
+                                    <option value="16000" selected>16 000 Hz (Estándar H7 / Reconocimiento de Voz)</option>
+                                    <option value="8000">8 000 Hz (Telefonía básica)</option>
+                                    <option value="22050">22 050 Hz (Media fidelidad)</option>
+                                    <option value="44100">44 100 Hz (Calidad CD)</option>
+                                </select>
+                                <span class="campo-ayuda">El navegador remuestrea automáticamente el audio antes de guardarlo.</span>
+                            </div>
+
+                            <div class="campo-grupo">
+                                <label class="campo-etiqueta" for="conf-meta">Meta de Grabaciones por Comando por Participante</label>
+                                <input type="number" id="conf-meta" class="campo-texto" min="5" max="200" value="40">
+                                <span class="campo-ayuda">Objetivo mostrado a cada usuario en su barra de progreso.</span>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+                            <button type="submit" class="boton boton-primario">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                    <polyline points="7 3 7 8 15 8"></polyline>
+                                </svg>
+                                Guardar Configuración
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- =============================================================== -->
+        <!-- BARRA FLOTANTE DE ACCIONES EN LOTE (STICKY BOTTOM)              -->
+        <!-- =============================================================== -->
+        <div class="barra-lote" id="barra-lote-grabaciones">
+            <span class="barra-lote-texto" id="texto-lote-grabaciones">0 seleccionadas</span>
+            <div class="barra-lote-acciones">
+                <button class="boton boton-pequeno boton-valido" onclick="adminApp.procesarLoteGrabaciones('validar')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    Marcar Válidas
+                </button>
+                <button class="boton boton-pequeno boton-rechazar" onclick="adminApp.procesarLoteGrabaciones('rechazar')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    Marcar Rechazadas
+                </button>
+                <button class="boton boton-pequeno boton-secundario" onclick="adminApp.procesarLoteGrabaciones('reset')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    Sin Revisar
+                </button>
+                <button class="boton boton-pequeno boton-secundario" onclick="adminApp.descargarZipSeleccionados()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+                    ZIP Selección
+                </button>
+                <button class="boton boton-pequeno boton-peligro" onclick="adminApp.procesarLoteGrabaciones('eliminar')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- MODAL: COMANDO INDIVIDUAL (CREAR / EDITAR)                          -->
+    <!-- =================================================================== -->
+    <div id="modal-comando" class="modal-overlay oculto">
+        <div class="modal-contenido modal-pequeno">
+            <div class="modal-cabecera">
+                <div>
+                    <h3 class="modal-titulo" id="modal-comando-titulo">Nuevo Comando</h3>
+                    <p class="modal-subtitulo">Configura los detalles del comando de voz</p>
+                </div>
+                <button class="boton-icono" onclick="adminApp.cerrarModal('modal-comando')">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <form id="form-comando" onsubmit="adminApp.guardarComando(event)">
+                <input type="hidden" id="cmd-id">
+                <div class="campo-grupo">
+                    <label class="campo-etiqueta" for="cmd-nombre">Nombre (Palabra / Frase a grabar)</label>
+                    <input type="text" id="cmd-nombre" class="campo-texto" placeholder="Ej: Adelante" required autocomplete="off">
+                </div>
+                <div class="campo-grupo">
+                    <label class="campo-etiqueta" for="cmd-desc">Instrucción para el participante</label>
+                    <textarea id="cmd-desc" class="campo-textarea" placeholder="Ej: Pronuncia la palabra 'Adelante' con voz clara y tono natural..."></textarea>
+                </div>
+                <div class="campo-grupo campo-fila">
+                    <label class="campo-etiqueta" for="cmd-orden">Orden de aparición</label>
+                    <input type="number" id="cmd-orden" class="campo-texto" style="width: 110px;" min="1" value="1">
+                </div>
+                <div class="campo-grupo campo-fila campo-toggle">
+                    <label class="campo-etiqueta" for="cmd-activo" style="cursor: pointer;">Activo (Visible para participantes)</label>
+                    <input type="checkbox" id="cmd-activo" class="campo-checkbox" checked>
+                </div>
+                <div class="modal-acciones">
+                    <button type="button" class="boton boton-fantasma" onclick="adminApp.cerrarModal('modal-comando')">Cancelar</button>
+                    <button type="submit" class="boton boton-primario">Guardar Comando</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- MODAL: CREAR COMANDOS EN LOTE                                       -->
+    <!-- =================================================================== -->
+    <div id="modal-lote" class="modal-overlay oculto">
+        <div class="modal-contenido modal-lote">
+            <div class="modal-cabecera">
+                <div>
+                    <h3 class="modal-titulo">Crear Comandos en Lote</h3>
+                    <p class="modal-subtitulo">Escribe o pega una lista de palabras/frases (una por línea o separadas por comas).</p>
+                </div>
+                <button class="boton-icono" onclick="adminApp.cerrarModal('modal-lote')">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <div class="lote-layout">
+                <div>
+                    <div class="campo-grupo">
+                        <label class="campo-etiqueta" for="lote-texto">Lista de Comandos</label>
+                        <textarea id="lote-texto" class="campo-textarea lote-textarea" placeholder="Adelante&#10;Atras&#10;Izquierda&#10;Derecha&#10;Encender&#10;Apagar" oninput="adminApp.actualizarPreviewLote()"></textarea>
+                    </div>
+                    <div class="campo-grupo campo-fila campo-toggle" style="margin-top: 14px;">
+                        <label class="campo-etiqueta" for="lote-auto-desc" style="text-transform: none; font-size: 0.88rem; cursor: pointer;">Auto-generar instrucción estándar</label>
+                        <input type="checkbox" id="lote-auto-desc" class="campo-checkbox" checked onchange="adminApp.actualizarPreviewLote()">
+                    </div>
+                </div>
+                <div class="lote-preview-container">
+                    <div class="lote-preview-header">
+                        <span class="lote-preview-titulo">Vista Previa y Deduplicación</span>
+                        <span class="badge badge-primario" id="lote-preview-count">0</span>
+                    </div>
+                    <div id="lote-preview-lista" class="lote-preview-lista">
+                        <div class="lote-preview-vacio">Escribe palabras para ver la vista previa en tiempo real.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-acciones">
+                <button type="button" class="boton boton-fantasma" onclick="adminApp.cerrarModal('modal-lote')">Cancelar</button>
+                <button type="button" class="boton boton-primario" id="btn-procesar-lote" onclick="adminApp.procesarLoteComandos()">Crear Comandos</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICACIONES TOAST -->
+    <div id="toast" class="toast"></div>
+
+    <!-- SCRIPTS MODULARES -->
+    <script src="/js/dsp.js"></script>
+    <script src="/js/espectrograma.js"></script>
+    <script src="/js/admin.js"></script>
+</body>
+</html>
