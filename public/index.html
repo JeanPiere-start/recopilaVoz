@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Plataforma de recopilación de voz para el experimento de separabilidad espectral H7. Graba comandos de voz y visualiza su espectrograma STFT.">
+    <title>RecopilaVoz — Registro de Comandos de Voz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/participante.css">
+</head>
+<body>
+
+<!-- ====================================================================== -->
+<!-- BANNER DE ANUNCIOS / MENSAJES DE LOS ADMINISTRADORES                    -->
+<!-- ====================================================================== -->
+<div id="banner-anuncio-global" class="banner-anuncio-participante oculto">
+    <div class="banner-anuncio-interior">
+        <div class="banner-anuncio-icono" id="anuncio-icono">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+        </div>
+        <div class="banner-anuncio-contenido">
+            <span class="banner-anuncio-etiqueta" id="anuncio-tag">Mensaje del Administrador</span>
+            <p class="banner-anuncio-texto" id="anuncio-texto"></p>
+        </div>
+        <button class="banner-anuncio-cerrar" onclick="document.getElementById('banner-anuncio-global').classList.add('oculto')" title="Cerrar aviso">&times;</button>
+    </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- PANTALLA 1: INGRESO DE PARTICIPANTE                                    -->
+<!-- ====================================================================== -->
+<div id="pantalla-ingreso" class="pantalla activa">
+    <div class="ingreso-contenedor">
+        <div class="ingreso-marca">
+            <div class="marca-icono">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" x2="12" y1="19" y2="22"></line>
+                </svg>
+            </div>
+            <div>
+                <h1 class="marca-nombre">RecopilaVoz</h1>
+                <p class="marca-subtitulo">Laboratorio de Análisis Espectral H7</p>
+            </div>
+        </div>
+
+        <div class="ingreso-tarjeta">
+            <h2 class="ingreso-titulo">Ingresa tu identificador</h2>
+            <p class="ingreso-descripcion">
+                Escribe un alias para tus grabaciones (ejemplo: <code>Hablante_A</code>).
+            </p>
+
+            <form id="form-ingreso" autocomplete="off">
+                <div class="campo-grupo">
+                    <label class="campo-etiqueta" for="alias-input">Alias de Participante <span style="color: var(--color-primario);">*</span></label>
+                    <input
+                        id="alias-input"
+                        type="text"
+                        class="campo-texto"
+                        placeholder="Ej: Hablante_A"
+                        maxlength="50"
+                        pattern="[a-zA-Z0-9_\-]+"
+                        required
+                        autofocus
+                        autocomplete="off"
+                    >
+                    <span class="campo-ayuda">Solo letras, números, guiones y guiones bajos.</span>
+                </div>
+
+                <!-- Acordeón / Registro Opcional de Datos -->
+                <details class="registro-opcional-detalles" id="detalles-registro-opcional">
+                    <summary class="registro-opcional-resumen">
+                        <span>Registro opcional de datos (Nombres y Contacto)</span>
+                        <svg class="chevron-icono" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </summary>
+                    <div class="registro-opcional-cuerpo">
+                        <div class="campo-grupo">
+                            <label class="campo-etiqueta" for="input-nombres">Nombres y Apellidos <small style="font-weight: normal; color: var(--color-texto-3);">(Opcional)</small></label>
+                            <input type="text" id="input-nombres" class="campo-texto" placeholder="Ej: Juan Pérez">
+                        </div>
+                        <div class="campo-grupo">
+                            <label class="campo-etiqueta" for="input-contacto">Forma de Contacto <small style="font-weight: normal; color: var(--color-texto-3);">(Teléfono o Correo - Opcional)</small></label>
+                            <input type="text" id="input-contacto" class="campo-texto" placeholder="Ej: +51 987654321 o correo@ejemplo.com">
+                        </div>
+                        <div class="campo-grupo">
+                            <label class="campo-etiqueta" for="input-notas">Notas o Información Adicional <small style="font-weight: normal; color: var(--color-texto-3);">(Opcional)</small></label>
+                            <input type="text" id="input-notas" class="campo-texto" placeholder="Ej: Acento regional, notas de voz, etc.">
+                        </div>
+                    </div>
+                </details>
+
+                <button type="submit" id="btn-ingresar" class="boton boton-primario boton-bloque" style="margin-top: 16px;">
+                    Ingresar al Laboratorio
+                </button>
+            </form>
+
+            <p class="ingreso-nota">
+                Tus audios se procesan a 16 000 Hz. Tus datos de contacto se almacenan de forma segura y se exportan en tu ficha personal <code>info_hablante.txt</code>.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- PANTALLA 2: LABORATORIO DE GRABACIÓN                                   -->
+<!-- ====================================================================== -->
+<div id="pantalla-principal" class="pantalla">
+
+    <!-- Encabezado superior -->
+    <header class="encabezado">
+        <div class="encabezado-interior">
+            <div class="encabezado-marca">
+                <span class="encabezado-logo">RV</span>
+                <span class="encabezado-nombre">RecopilaVoz</span>
+            </div>
+            <div class="encabezado-usuario">
+                <button id="btn-abrir-perfil" class="boton boton-secundario boton-pequeno" style="display: flex; align-items: center; gap: 6px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    Mi Ficha / Datos
+                </button>
+                <span class="etiqueta-alias" id="etiqueta-alias-header">---</span>
+                <button id="btn-salir" class="boton boton-fantasma boton-pequeno">Salir</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="contenido-principal">
+        <div class="diseno-dos-columnas">
+
+            <!-- COLUMNA IZQUIERDA: Comandos y Progreso -->
+            <aside class="columna-comandos">
+                <div class="seccion-cabecera">
+                    <h2 class="seccion-titulo">Comandos a Grabar</h2>
+                    <div class="progreso-contenedor">
+                        <div class="progreso-texto">
+                            <span>Progreso total</span>
+                            <span><strong id="progreso-grabados">0</strong> / <span id="progreso-total">0</span></span>
+                        </div>
+                        <div class="progreso-barra-fondo">
+                            <div id="progreso-barra" class="progreso-barra-relleno" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="lista-comandos" class="lista-comandos">
+                    <div class="cargando-comandos">
+                        <div class="spinner spinner-pequeno"></div>
+                        <span style="margin-left: 10px;">Cargando comandos...</span>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- COLUMNA DERECHA: Estudio de Grabación -->
+            <section class="columna-grabacion">
+
+                <!-- Estado: Ningún comando seleccionado -->
+                <div id="panel-vacio" class="panel-estado panel-vacio activo-panel">
+                    <div class="panel-vacio-icono">
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                            <line x1="12" x2="12" y1="19" y2="22"></line>
+                        </svg>
+                    </div>
+                    <p class="panel-vacio-texto">Selecciona un comando de la lista izquierda para comenzar a grabar.</p>
+                </div>
+
+                <!-- Panel de Grabación Activo -->
+                <div id="panel-grabacion" class="panel-grabacion">
+
+                    <div class="grabacion-cabecera">
+                        <div class="grabacion-comando-badge" id="comando-badge">---</div>
+                        <div id="estado-grabacion" class="estado-etiqueta estado-listo">Listo para grabar</div>
+                    </div>
+
+                    <p class="grabacion-instruccion" id="comando-instruccion">
+                        Selecciona un comando de la lista.
+                    </p>
+
+                    <!-- Banner de Cuenta Regresiva Previa (Previene que se corte la palabra) -->
+                    <div id="cuenta-regresiva-banner" class="cuenta-regresiva-banner oculto">
+                        <div class="cuenta-regresiva-numero" id="cuenta-regresiva-num">2</div>
+                        <div class="cuenta-regresiva-texto" id="cuenta-regresiva-txt">Prepárate para hablar...</div>
+                    </div>
+
+                    <!-- Espectrograma en vivo -->
+                    <div class="espectrograma-contenedor">
+                        <div class="espectrograma-titulo">Espectrograma en tiempo real</div>
+                        <canvas id="canvas-espectrograma-vivo" class="canvas-espectrograma" width="600" height="160"></canvas>
+                        <div class="espectrograma-leyenda">
+                            <span>0 Hz (Graves)</span>
+                            <span>Frecuencia en Vivo</span>
+                            <span>8000 Hz (Agudos)</span>
+                        </div>
+                    </div>
+
+                    <!-- VU Meter -->
+                    <div class="vu-meter-contenedor">
+                        <div class="vu-meter-etiqueta">Nivel de voz del micrófono</div>
+                        <div class="vu-meter-fondo">
+                            <div id="vu-barra" class="vu-meter-barra"></div>
+                        </div>
+                    </div>
+
+                    <!-- Ajuste de Cuenta Regresiva de Entrada -->
+                    <div class="ajuste-cuenta-previa">
+                        <label for="select-cuenta-previa">Preparación previa:</label>
+                        <select id="select-cuenta-previa" class="campo-select campo-select-mini">
+                            <option value="2" selected>2 segundos (Recomendado)</option>
+                            <option value="1">1 segundo</option>
+                            <option value="3">3 segundos</option>
+                            <option value="0">Instantáneo (Sin espera)</option>
+                        </select>
+                    </div>
+
+                    <!-- Controles de Grabación -->
+                    <div class="controles-grabacion">
+                        <button id="btn-grabar" class="boton boton-grabar">
+                            <span class="boton-grabar-punto"></span>
+                            Grabar (3 seg)
+                        </button>
+                        <button id="btn-detener" class="boton boton-detener" disabled>
+                            Detener
+                        </button>
+                    </div>
+
+                    <!-- Barra de Tiempo Transcurrido -->
+                    <div id="temporizador" class="temporizador oculto">
+                        <div id="temporizador-barra" class="temporizador-barra"></div>
+                        <span id="temporizador-texto">3.0s</span>
+                    </div>
+
+                    <!-- Resultado de la Grabación y Análisis Espectral -->
+                    <div id="panel-resultado" class="panel-resultado oculto">
+                        <div class="resultado-cabecera">
+                            <span class="resultado-titulo">Grabación Realizada</span>
+                            <span id="resultado-duracion" class="resultado-duracion">---</span>
+                        </div>
+
+                        <!-- Reproductor de Audio Previo -->
+                        <audio id="audio-preview-participante" controls style="width: 100%; height: 38px; accent-color: var(--color-primario);"></audio>
+
+                        <!-- Espectrograma del Resultado -->
+                        <canvas id="canvas-espectrograma-resultado" class="canvas-espectrograma canvas-resultado" width="600" height="180"></canvas>
+
+                        <!-- Descriptores Espectrales H7 -->
+                        <div id="descriptores-panel" class="descriptores-panel">
+                            <div class="descriptor-item">
+                                <span class="descriptor-nombre">Energía Baja (&lt;2kHz)</span>
+                                <span class="descriptor-valor" id="desc-baja">---</span>
+                            </div>
+                            <div class="descriptor-item">
+                                <span class="descriptor-nombre">Energía Alta (&gt;2kHz)</span>
+                                <span class="descriptor-valor" id="desc-alta">---</span>
+                            </div>
+                            <div class="descriptor-item">
+                                <span class="descriptor-nombre">HF / LF Ratio</span>
+                                <span class="descriptor-valor" id="desc-hflf">---</span>
+                            </div>
+                            <div class="descriptor-item">
+                                <span class="descriptor-nombre">ZCR (Cruces)</span>
+                                <span class="descriptor-valor" id="desc-zcr">---</span>
+                            </div>
+                        </div>
+
+                        <!-- Acciones Post-Grabación -->
+                        <div class="resultado-acciones">
+                            <button id="btn-repetir" class="boton boton-secundario">Repetir Grabación</button>
+                            <button id="btn-confirmar" class="boton boton-primario">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                Confirmar y Guardar
+                            </button>
+                        </div>
+
+                        <!-- Estado de subida -->
+                        <div id="cargando-subida" class="cargando-subida oculto">
+                            <div class="spinner spinner-pequeno"></div>
+                            <span>Guardando audio en el servidor...</span>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- SECCIÓN: MIS GRABACIONES                                         -->
+        <!-- ================================================================ -->
+        <section class="mis-grabaciones">
+            <div class="mis-grabaciones-cabecera">
+                <h2 class="seccion-titulo">Mis Grabaciones Guardadas</h2>
+                <button id="btn-recargar-grabaciones" class="boton boton-fantasma boton-pequeno">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    Actualizar
+                </button>
+            </div>
+            <div id="lista-mis-grabaciones" class="lista-mis-grabaciones">
+                <p class="lista-vacia">Aún no tienes grabaciones guardadas.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="pie-pagina">
+        <p>RecopilaVoz &mdash; Laboratorio de Análisis Espectral y Reconocimiento de Voz | Fs = 16 000 Hz</p>
+    </footer>
+</div>
+
+<!-- ====================================================================== -->
+<!-- MODAL: FICHA / DATOS DE REGISTRO DEL HABLANTE                          -->
+<!-- ====================================================================== -->
+<div id="modal-perfil-participante" class="modal-overlay oculto">
+    <div class="modal-contenido modal-pequeno">
+        <div class="modal-cabecera">
+            <div>
+                <h3 class="modal-titulo">Ficha del Hablante</h3>
+                <p class="modal-subtitulo">Identificador: <strong id="modal-perfil-alias" style="color: var(--color-primario); font-family: var(--fuente-mono);">---</strong></p>
+            </div>
+            <button class="boton-icono" id="btn-cerrar-modal-perfil" title="Cerrar ventana">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        
+        <form id="form-perfil-modal" autocomplete="off">
+            <div class="campo-grupo">
+                <label class="campo-etiqueta" for="perfil-modal-nombres">Nombres y Apellidos <small style="font-weight: normal; color: var(--color-texto-3);">(Opcional)</small></label>
+                <input type="text" id="perfil-modal-nombres" class="campo-texto" placeholder="Ej: Juan Pérez" maxlength="150">
+            </div>
+            <div class="campo-grupo">
+                <label class="campo-etiqueta" for="perfil-modal-contacto">Forma de Contacto <small style="font-weight: normal; color: var(--color-texto-3);">(Teléfono o Correo - Opcional)</small></label>
+                <input type="text" id="perfil-modal-contacto" class="campo-texto" placeholder="Ej: +51 987654321 o correo@ejemplo.com" maxlength="150">
+            </div>
+            <div class="campo-grupo">
+                <label class="campo-etiqueta" for="perfil-modal-notas">Notas o Información Adicional <small style="font-weight: normal; color: var(--color-texto-3);">(Opcional)</small></label>
+                <textarea id="perfil-modal-notas" class="campo-textarea" placeholder="Ej: Acento regional, condiciones de micrófono, etc." maxlength="500" style="min-height: 70px;"></textarea>
+            </div>
+
+            <div class="ficha-txt-info-caja">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--color-primario);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        <span style="font-size: 0.84rem; color: var(--color-texto-2);">Ficha técnica exportable: <code>info_hablante.txt</code></span>
+                    </div>
+                    <button type="button" class="boton boton-secundario boton-pequeno" id="btn-descargar-mi-txt" title="Descargar archivo TXT con tu información">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+                        Descargar TXT
+                    </button>
+                </div>
+            </div>
+
+            <div class="modal-acciones">
+                <button type="button" class="boton boton-fantasma" id="btn-cancelar-modal-perfil">Cerrar</button>
+                <button type="submit" class="boton boton-primario" id="btn-guardar-modal-perfil">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    Guardar Ficha
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Notificación Toast -->
+<div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+<!-- Scripts -->
+<script src="js/dsp.js"></script>
+<script src="js/espectrograma.js"></script>
+<script src="js/grabador.js"></script>
+<script src="js/participante.js"></script>
+</body>
+</html>
