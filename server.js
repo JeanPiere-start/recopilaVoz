@@ -673,9 +673,20 @@ app.put('/api/admin/anuncio', verificarAdmin, async (req, res) => {
 
         if (supabase) {
             try {
+                // Patrón singleton: reutilizar el id de la fila existente para no acumular
+                // una fila nueva en cada actualización del anuncio.
+                const { data: existente } = await supabase
+                    .from('anuncios')
+                    .select('id')
+                    .order('updated_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                const payloadAnuncio = existente ? { id: existente.id, ...anuncioObj } : anuncioObj;
+
                 const { data, error } = await supabase
                     .from('anuncios')
-                    .upsert(anuncioObj)
+                    .upsert(payloadAnuncio)
                     .select()
                     .single();
                 if (!error && data) {
@@ -997,7 +1008,7 @@ app.get('/api/admin/hablantes/:alias', verificarAdmin, async (req, res) => {
  * GET /api/admin/hablantes/:alias/info-txt
  * Descarga o visualiza la ficha de información del hablante en formato TXT.
  */
-app.get('/api/admin/hablantes/:alias/info-txt', async (req, res) => {
+app.get('/api/admin/hablantes/:alias/info-txt', verificarAdmin, async (req, res) => {
     try {
         const { alias } = req.params;
         const aliasSanitizado = alias.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
