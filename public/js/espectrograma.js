@@ -1,163 +1,197 @@
 /**
- * espectrograma.js — Renderizado de espectrograma en Canvas 2D
- * Recibe la salida de DSP.espectrogramaSTFT y dibuja en un elemento canvas.
- * Sin dependencias externas. Compatible con uso en móvil.
+ * espectrograma.js — Renderizado de espectrogramas en Canvas 2D
+ * Renderiza matrices STFT calculadas por dsp.js con mapa de calor científico (Magma).
+ * Soporta modo estático de alta resolución y modo scroll en tiempo real (en vivo).
+ * Sin dependencias externas.
  */
 
 'use strict';
 
 /**
- * Convierte un valor de potencia en dB a un color usando la paleta Magma.
- * @param {number} valorNorm - valor normalizado [0, 1]
- * @returns {string} color CSS rgb()
+ * Convierte un valor normalizado [0, 1] a color RGB según la paleta científica Magma.
+ * @param {number} valorNorm - Valor normalizado entre 0.0 (silencio) y 1.0 (máxima energía)
+ * @returns {string} Color en formato rgb(r, g, b)
  */
 function paleta(valorNorm) {
-    // Paleta Magma simplificada (negros, rojos, amarillos)
     const t = Math.max(0, Math.min(1, valorNorm));
     if (t < 0.25) {
-        const r = Math.round(t * 4 * 80);
-        const g = 0;
-        const b = Math.round(t * 4 * 80 + 20);
+        const f = t * 4;
+        const r = Math.round(f * 70);
+        const g = Math.round(f * 10);
+        const b = Math.round(20 + f * 90);
         return `rgb(${r},${g},${b})`;
     } else if (t < 0.5) {
-        const tt = (t - 0.25) * 4;
-        const r = Math.round(80 + tt * 130);
-        const g = Math.round(tt * 30);
-        const b = Math.round(80 - tt * 50);
+        const f = (t - 0.25) * 4;
+        const r = Math.round(70 + f * 115);
+        const g = Math.round(10 + f * 40);
+        const b = Math.round(110 - f * 50);
         return `rgb(${r},${g},${b})`;
     } else if (t < 0.75) {
-        const tt = (t - 0.5) * 4;
-        const r = Math.round(210 + tt * 40);
-        const g = Math.round(30 + tt * 120);
-        const b = Math.round(30);
+        const f = (t - 0.5) * 4;
+        const r = Math.round(185 + f * 55);
+        const g = Math.round(50 + f * 95);
+        const b = Math.round(60 - f * 20);
         return `rgb(${r},${g},${b})`;
     } else {
-        const tt = (t - 0.75) * 4;
-        const r = 255;
-        const g = Math.round(150 + tt * 100);
-        const b = Math.round(30 + tt * 200);
+        const f = (t - 0.75) * 4;
+        const r = Math.round(240 + f * 15);
+        const g = Math.round(145 + f * 105);
+        const b = Math.round(40 + f * 180);
         return `rgb(${r},${g},${b})`;
     }
 }
 
 /**
- * Dibuja el espectrograma en el canvas dado.
+ * Dibuja un espectrograma STFT completo en un elemento Canvas HTML5.
  * @param {HTMLCanvasElement} canvas
- * @param {{ tiempos, frecuencias, potencias }} datos - salida de DSP.espectrogramaSTFT
- * @param {{ dbMin, dbMax, mostrarEjes }} opciones
+ * @param {{ tiempos: Float32Array, frecuencias: Float32Array, potencias: Float32Array[] }} datos
+ * @param {{ dbMin?: number, dbMax?: number, mostrarEjes?: boolean, colorFondo?: string }} [opciones]
  */
 function dibujarEspectrograma(canvas, datos, opciones = {}) {
-    const { tiempos, frecuencias, potencias } = datos;
-    if (!potencias || potencias.length === 0) return;
+    if (!canvas || !datos || !datos.potencias || datos.potencias.length === 0) return;
 
-    const dbMin = opciones.dbMin ?? -80;
+    const { tiempos, frecuencias, potencias } = datos;
+    const dbMin = opciones.dbMin ?? -75;
     const dbMax = opciones.dbMax ?? 0;
     const mostrarEjes = opciones.mostrarEjes !== false;
+    const colorFondo = opciones.colorFondo || '#080b12';
 
     const ctx = canvas.getContext('2d');
-    const margenIzq = mostrarEjes ? 50 : 0;
-    const margenInf = mostrarEjes ? 30 : 0;
-    const margenSup = mostrarEjes ? 10 : 0;
-    const margenDer = mostrarEjes ? 10 : 0;
+    const width = canvas.width;
+    const height = canvas.height;
 
-    const anchoPlot = canvas.width - margenIzq - margenDer;
-    const altoPlot = canvas.height - margenInf - margenSup;
+    const margenIzq = mostrarEjes ? 56 : 0;
+    const margenInf = mostrarEjes ? 28 : 0;
+    const margenSup = mostrarEjes ? 12 : 0;
+    const margenDer = mostrarEjes ? 12 : 0;
 
-    // Fondo
-    ctx.fillStyle = '#0d0d14';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const anchoPlot = width - margenIzq - margenDer;
+    const altoPlot = height - margenInf - margenSup;
+
+    // Fondo oscuro
+    ctx.fillStyle = colorFondo;
+    ctx.fillRect(0, 0, width, height);
 
     const numFrames = potencias.length;
     const numBins = frecuencias.length;
-    const anchoCelda = Math.max(1, anchoPlot / numFrames);
-    const altoCelda = Math.max(1, altoPlot / numBins);
+    const anchoCelda = anchoPlot / numFrames;
+    const altoCelda = altoPlot / numBins;
 
-    // Dibujar celdas del espectrograma
+    // Renderizado de celdas espectrales
     for (let f = 0; f < numFrames; f++) {
+        const framePot = potencias[f];
+        const x = margenIzq + (f * anchoCelda);
+
         for (let k = 0; k < numBins; k++) {
-            const potDb = 10 * Math.log10(Math.max(1e-10, potencias[f][k]));
+            const pot = framePot[k];
+            const potDb = 10 * Math.log10(Math.max(1e-10, pot));
             const valorNorm = (potDb - dbMin) / (dbMax - dbMin);
 
-            // Invertir eje Y (frecuencia 0 abajo)
-            const x = margenIzq + f * anchoCelda;
-            const y = margenSup + (numBins - 1 - k) * altoCelda;
+            // Invertir eje vertical: frecuencias bajas abajo, altas arriba
+            const y = margenSup + altoPlot - ((k + 1) * altoCelda);
 
             ctx.fillStyle = paleta(valorNorm);
-            ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(anchoCelda), Math.ceil(altoCelda));
+            ctx.fillRect(
+                Math.floor(x),
+                Math.floor(y),
+                Math.ceil(anchoCelda + 0.5),
+                Math.ceil(altoCelda + 0.5)
+            );
         }
     }
 
     if (!mostrarEjes) return;
 
-    // Ejes y etiquetas
-    ctx.fillStyle = '#c8c8d8';
-    ctx.font = '11px monospace';
-    ctx.textAlign = 'right';
+    // Guías y etiquetas de ejes
+    ctx.font = '10px "JetBrains Mono", monospace';
+    ctx.textBaseline = 'middle';
 
-    // Eje Y — frecuencia
-    const tasa = frecuencias[frecuencias.length - 1] * 2;
-    const marcasFrecuencia = [0, 2000, 4000, 6000, 8000].filter(f => f <= tasa / 2);
-    marcasFrecuencia.forEach(frec => {
-        const y = margenSup + altoPlot - (frec / (tasa / 2)) * altoPlot;
-        ctx.fillText(`${frec}`, margenIzq - 4, y + 4);
-        ctx.strokeStyle = 'rgba(200,200,216,0.15)';
+    // Eje vertical: Frecuencia en Hz
+    const maxFreq = frecuencias[frecuencias.length - 1] || 8000;
+    const ticksFreq = [0, 2000, 4000, 6000, 8000].filter(f => f <= maxFreq + 50);
+
+    ticksFreq.forEach(freq => {
+        const y = margenSup + altoPlot - ((freq / maxFreq) * altoPlot);
+
+        // Línea tenue de cuadrícula
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
         ctx.beginPath();
         ctx.moveTo(margenIzq, y);
         ctx.lineTo(margenIzq + anchoPlot, y);
         ctx.stroke();
+
+        // Texto etiqueta
+        ctx.fillStyle = '#94a3b8';
+        ctx.textAlign = 'right';
+        const textoLabel = freq >= 1000 ? `${freq / 1000}k` : `${freq}`;
+        ctx.fillText(textoLabel, margenIzq - 8, y);
     });
 
-    // Eje Y label
-    ctx.save();
-    ctx.translate(12, canvas.height / 2);
-    ctx.rotate(-Math.PI / 2);
+    // Eje horizontal: Tiempo en segundos
+    const duracionTotal = tiempos[tiempos.length - 1] || 3.0;
+    const pasoTiempo = duracionTotal > 4 ? 1.0 : 0.5;
     ctx.textAlign = 'center';
-    ctx.fillText('Frecuencia (Hz)', 0, 0);
-    ctx.restore();
+    ctx.textBaseline = 'top';
 
-    // Eje X — tiempo
-    ctx.textAlign = 'center';
-    const durTotal = tiempos[tiempos.length - 1] || 1;
-    const marcasTiempo = [0, 0.5, 1, 1.5, 2, 2.5, 3].filter(t => t <= durTotal + 0.1);
-    marcasTiempo.forEach(t => {
-        const x = margenIzq + (t / durTotal) * anchoPlot;
-        ctx.fillText(`${t.toFixed(1)}s`, x, canvas.height - 5);
-    });
+    for (let t = 0; t <= duracionTotal + 0.01; t += pasoTiempo) {
+        const x = margenIzq + ((t / duracionTotal) * anchoPlot);
 
-    // Eje X label
-    ctx.fillText('Tiempo (s)', margenIzq + anchoPlot / 2, canvas.height - 2);
-}
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.beginPath();
+        ctx.moveTo(x, margenSup);
+        ctx.lineTo(x, margenSup + altoPlot);
+        ctx.stroke();
 
-/**
- * Dibuja un espectrograma parcial en tiempo real (agrega columnas de la derecha).
- * Desplaza el canvas a la izquierda y agrega la nueva columna.
- * @param {HTMLCanvasElement} canvas
- * @param {Float32Array} potenciaFrame - potencias del frame actual
- * @param {{ dbMin, dbMax }} opciones
- */
-function dibujarColumnaEnVivo(canvas, potenciaFrame, opciones = {}) {
-    const dbMin = opciones.dbMin ?? -80;
-    const dbMax = opciones.dbMax ?? 0;
-    const anchoCelda = opciones.anchoCelda ?? 4;
-    const ctx = canvas.getContext('2d');
-    const numBins = potenciaFrame.length;
-
-    // Desplazar imagen a la izquierda
-    ctx.drawImage(canvas, -anchoCelda, 0);
-
-    // Dibujar nueva columna en la derecha
-    const altoCelda = canvas.height / numBins;
-    for (let k = 0; k < numBins; k++) {
-        const potDb = 10 * Math.log10(Math.max(1e-10, potenciaFrame[k]));
-        const valorNorm = (potDb - dbMin) / (dbMax - dbMin);
-        const y = (numBins - 1 - k) * altoCelda;
-        ctx.fillStyle = paleta(valorNorm);
-        ctx.fillRect(canvas.width - anchoCelda, Math.floor(y), anchoCelda, Math.ceil(altoCelda));
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(`${t.toFixed(1)}s`, x, margenSup + altoPlot + 6);
     }
 }
 
+/**
+ * Dibuja una columna espectral en vivo desplazando el canvas existente a la izquierda.
+ * @param {HTMLCanvasElement} canvas
+ * @param {Float32Array} potenciaFrame - Potencias del frame actual
+ * @param {{ dbMin?: number, dbMax?: number, anchoColumna?: number }} [opciones]
+ */
+function dibujarColumnaEnVivo(canvas, potenciaFrame, opciones = {}) {
+    if (!canvas || !potenciaFrame || potenciaFrame.length === 0) return;
+
+    const dbMin = opciones.dbMin ?? -75;
+    const dbMax = opciones.dbMax ?? 0;
+    const anchoCol = opciones.anchoColumna ?? 3;
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Desplazar imagen hacia la izquierda
+    ctx.drawImage(canvas, -anchoCol, 0);
+
+    // Dibujar la nueva columna a la derecha
+    const numBins = potenciaFrame.length;
+    const altoCelda = height / numBins;
+
+    for (let k = 0; k < numBins; k++) {
+        const pot = potenciaFrame[k];
+        const potDb = 10 * Math.log10(Math.max(1e-10, pot));
+        const valorNorm = (potDb - dbMin) / (dbMax - dbMin);
+        const y = height - ((k + 1) * altoCelda);
+
+        ctx.fillStyle = paleta(valorNorm);
+        ctx.fillRect(width - anchoCol, Math.floor(y), anchoCol, Math.ceil(altoCelda));
+    }
+}
+
+// Exportaciones
+const espectroExports = {
+    paleta,
+    dibujarEspectrograma,
+    dibujarColumnaEnVivo
+};
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { dibujarEspectrograma, dibujarColumnaEnVivo, paleta };
-} else {
-    window.Espectrograma = { dibujarEspectrograma, dibujarColumnaEnVivo, paleta };
+    module.exports = espectroExports;
+}
+if (typeof window !== 'undefined') {
+    window.Espectrograma = espectroExports;
+    window.dibujarEspectrograma = dibujarEspectrograma;
 }

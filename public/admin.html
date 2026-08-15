@@ -3,458 +3,592 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Panel de administracion de RecopilaVoz. Gestion de grabaciones, participantes y comandos.">
-    <title>RecopilaVoz — Panel de Administrador</title>
+    <title>Panel de Administración | RecopilaVoz</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/admin.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/admin.css">
 </head>
 <body class="tema-admin">
 
-<!-- ====================================================================== -->
-<!-- PANTALLA DE AUTENTICACION ADMIN                                        -->
-<!-- ====================================================================== -->
-<div id="pantalla-auth" class="pantalla activa">
-    <div class="auth-contenedor">
-        <div class="auth-marca">
-            <div class="marca-icono marca-admin">
-                <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-                    <rect width="40" height="40" rx="10" fill="url(#gradAdmin)"/>
-                    <rect x="11" y="18" width="18" height="14" rx="2" stroke="white" stroke-width="1.5" fill="none"/>
-                    <path d="M15 18v-4a5 5 0 0 1 10 0v4" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-                    <circle cx="20" cy="24" r="2" fill="white"/>
-                    <defs>
-                        <linearGradient id="gradAdmin" x1="0" y1="0" x2="40" y2="40">
-                            <stop offset="0%" stop-color="#1e40af"/>
-                            <stop offset="100%" stop-color="#6d28d9"/>
-                        </linearGradient>
-                    </defs>
-                </svg>
-            </div>
-            <div>
-                <h1 class="marca-nombre">Panel de Administrador</h1>
-                <p class="marca-subtitulo">RecopilaVoz &mdash; Gestion de corpus</p>
-            </div>
-        </div>
-
-        <div class="auth-tarjeta">
-            <h2 class="auth-titulo">Acceso restringido</h2>
-            <p class="auth-descripcion">Ingresa el token de administrador para continuar.</p>
-
-            <form id="form-auth" autocomplete="off">
-                <div class="campo-grupo">
-                    <label class="campo-etiqueta" for="token-input">Token de administrador</label>
-                    <input
-                        id="token-input"
-                        type="password"
-                        class="campo-texto"
-                        placeholder="Token secreto"
-                        required
-                        autocomplete="current-password"
-                    >
+    <!-- =================================================================== -->
+    <!-- PANTALLA 1: AUTENTICACIÓN ADMIN                                     -->
+    <!-- =================================================================== -->
+    <main id="pantalla-auth" class="pantalla activa">
+        <div class="auth-contenedor">
+            <div class="auth-tarjeta">
+                <div class="auth-marca">
+                    <div class="marca-icono-admin">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                            <line x1="12" x2="12" y1="19" y2="22"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="marca-nombre">Admin Panel</h1>
+                        <p class="marca-subtitulo">RecopilaVoz • Control Espectral</p>
+                    </div>
                 </div>
-                <div id="auth-error" class="mensaje-error oculto">Token invalido. Verifica tu clave.</div>
-                <button type="submit" id="btn-auth" class="boton boton-primario boton-bloque">
-                    Ingresar
-                </button>
-            </form>
+
+                <h2 class="auth-titulo">Acceso de Administrador</h2>
+                <p class="auth-descripcion">Ingresa cualquiera de los tokens autorizados en <code>ADMIN_TOKENS</code>.</p>
+
+                <form id="form-auth" onsubmit="adminApp.iniciarSesion(event)">
+                    <div class="campo-grupo">
+                        <label class="campo-etiqueta" for="input-token">Token de Acceso</label>
+                        <input type="password" id="input-token" class="campo-texto" placeholder="••••••••••••" required autofocus autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="boton boton-primario boton-bloque" style="margin-top: 14px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                            <polyline points="10 17 15 12 10 7"></polyline>
+                            <line x1="15" x2="3" y1="12" y2="12"></line>
+                        </svg>
+                        Iniciar Sesión
+                    </button>
+                </form>
+            </div>
         </div>
-    </div>
-</div>
+    </main>
 
-<!-- ====================================================================== -->
-<!-- PANEL PRINCIPAL ADMIN                                                  -->
-<!-- ====================================================================== -->
-<div id="panel-admin" class="pantalla">
-
-    <!-- Barra lateral -->
-    <nav class="admin-sidebar">
-        <div class="sidebar-marca">
-            <span class="sidebar-logo">RV</span>
-            <span class="sidebar-nombre">Admin</span>
-        </div>
-
-        <ul class="sidebar-menu">
-            <li>
-                <button class="sidebar-item activo" data-tab="tab-resumen" id="nav-resumen">
-                    <svg class="sidebar-icono" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+    <!-- =================================================================== -->
+    <!-- PANTALLA 2: PANEL PRINCIPAL ADMINISTRADOR                           -->
+    <!-- =================================================================== -->
+    <div id="pantalla-admin" class="pantalla">
+        
+        <!-- SIDEBAR DE NAVEGACIÓN -->
+        <aside class="admin-sidebar">
+            <div class="sidebar-marca">
+                <div class="sidebar-logo-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" x2="12" y1="19" y2="22"></line>
                     </svg>
-                    Resumen
+                </div>
+                <div>
+                    <h2>RecopilaVoz</h2>
+                    <span class="sidebar-rol-tag" id="sidebar-rol-badge">Admin</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-menu">
+                <div class="sidebar-item activo" onclick="adminApp.cambiarTab('resumen')">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="3" x2="21" y1="9" y2="9"></line>
+                            <line x1="9" x2="9" y1="21" y2="9"></line>
+                        </svg>
+                    </div>
+                    <span>Dashboard</span>
+                </div>
+                <div class="sidebar-item" onclick="adminApp.cambiarTab('grabaciones')">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        </svg>
+                    </div>
+                    <span>Grabaciones</span>
+                </div>
+                <div class="sidebar-item" onclick="adminApp.cambiarTab('comandos')">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="8" x2="21" y1="6" y2="6"></line>
+                            <line x1="8" x2="21" y1="12" y2="12"></line>
+                            <line x1="8" x2="21" y1="18" y2="18"></line>
+                            <line x1="3" x2="3.01" y1="6" y2="6"></line>
+                            <line x1="3" x2="3.01" y1="12" y2="12"></line>
+                            <line x1="3" x2="3.01" y1="18" y2="18"></line>
+                        </svg>
+                    </div>
+                    <span>Comandos</span>
+                </div>
+                <div class="sidebar-item" onclick="adminApp.cambiarTab('admins')">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                    </div>
+                    <span>Admins</span>
+                </div>
+                <div class="sidebar-item" onclick="adminApp.cambiarTab('configuracion')">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="4" x2="20" y1="21" y2="21"></line>
+                            <line x1="4" x2="20" y1="3" y2="3"></line>
+                            <line x1="4" x2="20" y1="12" y2="12"></line>
+                            <circle cx="9" cy="12" r="3"></circle>
+                            <circle cx="15" cy="21" r="3"></circle>
+                            <circle cx="15" cy="3" r="3"></circle>
+                        </svg>
+                    </div>
+                    <span>Configuración</span>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="boton sidebar-item sidebar-salir" onclick="adminApp.cerrarSesion()">
+                    <div class="sidebar-icono">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" x2="9" y1="12" y2="12"></line>
+                        </svg>
+                    </div>
+                    <span>Cerrar Sesión</span>
                 </button>
-            </li>
-            <li>
-                <button class="sidebar-item" data-tab="tab-grabaciones" id="nav-grabaciones">
-                    <svg class="sidebar-icono" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"/>
-                    </svg>
-                    Grabaciones
-                </button>
-            </li>
-            <li>
-                <button class="sidebar-item" data-tab="tab-comandos" id="nav-comandos">
-                    <svg class="sidebar-icono" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
-                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
-                    </svg>
-                    Comandos
-                </button>
-            </li>
-            <li>
-                <button class="sidebar-item" data-tab="tab-configuracion" id="nav-configuracion">
-                    <svg class="sidebar-icono" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
-                    </svg>
-                    Configuracion
-                </button>
-            </li>
-        </ul>
-
-        <div class="sidebar-footer">
-            <button id="btn-cerrar-sesion" class="sidebar-item sidebar-salir">
-                <svg class="sidebar-icono" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/>
-                </svg>
-                Cerrar sesion
-            </button>
-        </div>
-    </nav>
-
-    <!-- Contenido principal admin -->
-    <main class="admin-main">
-
-        <!-- ============================================================== -->
-        <!-- TAB: Resumen                                                    -->
-        <!-- ============================================================== -->
-        <div id="tab-resumen" class="admin-tab activo-tab">
-            <div class="admin-cabecera">
-                <h2 class="admin-titulo-pagina">Resumen del corpus</h2>
-                <button id="btn-actualizar-stats" class="boton boton-fantasma boton-pequeno">Actualizar</button>
             </div>
+        </aside>
 
-            <div class="stats-grid">
-                <div class="stat-tarjeta">
-                    <div class="stat-valor" id="stat-total-grabaciones">---</div>
-                    <div class="stat-etiqueta">Total de grabaciones</div>
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="admin-main">
+            
+            <!-- =============================================================== -->
+            <!-- TAB 1: RESUMEN / DASHBOARD                                      -->
+            <!-- =============================================================== -->
+            <section id="tab-resumen" class="admin-tab activo-tab">
+                <div class="admin-cabecera">
+                    <div>
+                        <h2 class="admin-titulo-pagina">Dashboard General</h2>
+                        <p class="admin-subtitulo">Monitoreo en tiempo real del corpus de voz para el experimento H7</p>
+                    </div>
+                    <button class="boton boton-secundario" onclick="adminApp.cargarStats()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Actualizar Métricas
+                    </button>
                 </div>
-                <div class="stat-tarjeta">
-                    <div class="stat-valor" id="stat-total-participantes">---</div>
-                    <div class="stat-etiqueta">Participantes</div>
+
+                <div class="stats-grid">
+                    <div class="stat-tarjeta">
+                        <div class="stat-icono"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path></svg></div>
+                        <span class="stat-etiqueta">Total Grabaciones</span>
+                        <span class="stat-valor" id="stat-total-grabaciones">-</span>
+                        <span class="stat-subtexto" id="stat-subtexto-duracion">0s de audio acumulado</span>
+                    </div>
+                    <div class="stat-tarjeta stat-validados">
+                        <div class="stat-icono"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
+                        <span class="stat-etiqueta">Validadas (✓)</span>
+                        <span class="stat-valor" id="stat-validados">-</span>
+                        <span class="stat-subtexto" id="stat-tasa-aprobacion">0% tasa de aprobación</span>
+                    </div>
+                    <div class="stat-tarjeta stat-rechazados">
+                        <div class="stat-icono"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></div>
+                        <span class="stat-etiqueta">Rechazadas (✗)</span>
+                        <span class="stat-valor" id="stat-rechazados">-</span>
+                        <span class="stat-subtexto">Muestras descartadas</span>
+                    </div>
+                    <div class="stat-tarjeta stat-pendientes">
+                        <div class="stat-icono"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+                        <span class="stat-etiqueta">Sin Revisar (?)</span>
+                        <span class="stat-valor" id="stat-pendientes">-</span>
+                        <span class="stat-subtexto">Pendientes de escucha</span>
+                    </div>
+                    <div class="stat-tarjeta">
+                        <div class="stat-icono"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg></div>
+                        <span class="stat-etiqueta">Participantes</span>
+                        <span class="stat-valor" id="stat-participantes">-</span>
+                        <span class="stat-subtexto" id="stat-promedio-part">0 muestras / persona</span>
+                    </div>
                 </div>
-                <div class="stat-tarjeta">
-                    <div class="stat-valor" id="stat-total-comandos">---</div>
-                    <div class="stat-etiqueta">Comandos activos</div>
-                </div>
-            </div>
 
-            <!-- Distribucion por comando -->
-            <div class="admin-seccion">
-                <h3 class="admin-subtitulo">Grabaciones por comando</h3>
-                <div id="grafico-comandos" class="grafico-barras"></div>
-            </div>
-
-            <!-- Distribucion por participante -->
-            <div class="admin-seccion">
-                <h3 class="admin-subtitulo">Grabaciones por participante</h3>
-                <div id="tabla-participantes" class="tabla-participantes"></div>
-            </div>
-
-            <!-- Exportacion -->
-            <div class="admin-seccion">
-                <h3 class="admin-subtitulo">Exportar metadatos</h3>
-                <div class="exportar-acciones">
-                    <button id="btn-exportar-json" class="boton boton-secundario">Descargar JSON</button>
-                    <button id="btn-exportar-csv" class="boton boton-secundario">Descargar CSV</button>
-                    <button id="btn-descargar-todo-zip" class="boton boton-primario">Descargar todos los audios (ZIP)</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ============================================================== -->
-        <!-- TAB: Grabaciones                                               -->
-        <!-- ============================================================== -->
-        <div id="tab-grabaciones" class="admin-tab">
-            <div class="admin-cabecera">
-                <h2 class="admin-titulo-pagina">Grabaciones del corpus</h2>
-            </div>
-
-            <!-- Filtros -->
-            <div class="filtros-panel">
-                <div class="campo-grupo campo-inline">
-                    <label class="campo-etiqueta" for="filtro-alias">Participante</label>
-                    <input id="filtro-alias" type="text" class="campo-texto campo-compacto" placeholder="Alias...">
-                </div>
-                <div class="campo-grupo campo-inline">
-                    <label class="campo-etiqueta" for="filtro-comando">Comando</label>
-                    <select id="filtro-comando" class="campo-select campo-compacto">
-                        <option value="">Todos</option>
-                    </select>
-                </div>
-                <button id="btn-filtrar" class="boton boton-secundario">Filtrar</button>
-                <button id="btn-limpiar-filtros" class="boton boton-fantasma">Limpiar</button>
-                <button id="btn-descargar-filtro-zip" class="boton boton-primario" style="margin-left: auto;">Descargar filtrados (ZIP)</button>
-            </div>
-
-            <!-- Tabla de grabaciones -->
-            <div class="tabla-contenedor">
-                <table class="tabla-datos" id="tabla-grabaciones">
-                    <thead>
-                        <tr>
-                            <th>Participante</th>
-                            <th>Comando</th>
-                            <th>Duracion</th>
-                            <th>Fecha</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabla-grabaciones-cuerpo">
-                        <tr><td colspan="5" class="celda-cargando"><div class="spinner"></div> Cargando...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Paginacion -->
-            <div class="paginacion" id="paginacion">
-                <button id="btn-pag-anterior" class="boton boton-fantasma boton-pequeno" disabled>Anterior</button>
-                <span id="info-paginacion" class="paginacion-info">Pagina 1</span>
-                <button id="btn-pag-siguiente" class="boton boton-fantasma boton-pequeno">Siguiente</button>
-            </div>
-        </div>
-
-        <!-- ============================================================== -->
-        <!-- TAB: Comandos                                                  -->
-        <!-- ============================================================== -->
-        <div id="tab-comandos" class="admin-tab">
-            <div class="admin-cabecera">
-                <h2 class="admin-titulo-pagina">Gestion de comandos</h2>
-                <div style="display:flex; gap:8px;">
-                    <button id="btn-lote-comandos" class="boton boton-secundario boton-pequeno">Crear en lote</button>
-                    <button id="btn-nuevo-comando" class="boton boton-primario boton-pequeno">Nuevo comando</button>
-                </div>
-            </div>
-
-            <div id="lista-comandos-admin" class="lista-comandos-admin">
-                <div class="cargando-comandos"><div class="spinner"></div> Cargando...</div>
-            </div>
-        </div>
-
-        <!-- ============================================================== -->
-        <!-- TAB: Configuracion de Grabacion                                -->
-        <!-- ============================================================== -->
-        <div id="tab-configuracion" class="admin-tab">
-            <div class="admin-cabecera">
-                <h2 class="admin-titulo-pagina">Configuracion de grabacion</h2>
-            </div>
-
-            <div class="admin-seccion">
-                <p style="color: var(--color-texto-2); margin-bottom: 24px; font-size: 0.9375rem;">
-                    Estos parametros se aplican globalmente a todos los participantes al iniciar una nueva grabacion.
-                </p>
-
-                <div class="config-grabacion-tarjeta">
-                    <div class="config-estado" id="config-estado-actual">
-                        <div class="config-estado-item">
-                            <span class="config-estado-etiqueta">Duracion actual</span>
-                            <span class="config-estado-valor" id="config-valor-duracion">--- s</span>
+                <!-- Desgloses visuales -->
+                <div class="dashboard-desglose-grid">
+                    <div class="panel-desglose">
+                        <div class="panel-desglose-header">
+                            <h3 class="panel-desglose-titulo">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                                </svg>
+                                Balance de Muestras por Comando
+                            </h3>
+                            <span class="badge badge-primario" id="meta-comando-badge">Meta: 40</span>
                         </div>
-                        <div class="config-estado-item">
-                            <span class="config-estado-etiqueta">Tasa de muestreo actual</span>
-                            <span class="config-estado-valor" id="config-valor-tasa">--- Hz</span>
+                        <p class="panel-desglose-desc">Haz clic en un comando para ver y auditar sus grabaciones</p>
+                        <div id="desglose-comandos" class="desglose-lista">
+                            <div class="spinner-inline"><div class="spinner spinner-pequeno"></div> Cargando balance de comandos...</div>
                         </div>
                     </div>
 
-                    <form id="form-config-grabacion" autocomplete="off">
-                        <div class="campo-grupo">
-                            <label class="campo-etiqueta" for="config-duracion">Duracion de la grabacion (segundos)</label>
-                            <select id="config-duracion" class="campo-select">
-                                <option value="1">1 segundo</option>
-                                <option value="2">2 segundos</option>
-                                <option value="3" selected>3 segundos</option>
-                                <option value="4">4 segundos</option>
-                                <option value="5">5 segundos</option>
-                                <option value="6">6 segundos</option>
-                                <option value="7">7 segundos</option>
-                                <option value="8">8 segundos</option>
-                                <option value="9">9 segundos</option>
-                                <option value="10">10 segundos</option>
-                            </select>
-                            <span class="campo-ayuda">Tiempo que dura cada grabacion de los participantes.</span>
+                    <div class="panel-desglose">
+                        <div class="panel-desglose-header">
+                            <h3 class="panel-desglose-titulo">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <polyline points="16 11 18 13 22 9"></polyline>
+                                </svg>
+                                Actividad por Participante
+                            </h3>
+                        </div>
+                        <p class="panel-desglose-desc">Haz clic en un participante para filtrar sus audios</p>
+                        <div id="desglose-participantes" class="desglose-lista">
+                            <div class="spinner-inline"><div class="spinner spinner-pequeno"></div> Cargando participantes...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =============================================================== -->
+            <!-- TAB 2: GRABACIONES / AUDIOS                                     -->
+            <!-- =============================================================== -->
+            <section id="tab-grabaciones" class="admin-tab">
+                <div class="admin-cabecera">
+                    <div>
+                        <h2 class="admin-titulo-pagina">Audios Recolectados</h2>
+                        <p class="admin-subtitulo">Escucha, analiza el espectrograma STFT y valida las muestras para el dataset</p>
+                    </div>
+                    <div class="exportar-acciones">
+                        <button class="boton boton-secundario" onclick="adminApp.exportarDatos('csv')">Exportar CSV</button>
+                        <button class="boton boton-secundario" onclick="adminApp.exportarDatos('json')">Exportar JSON</button>
+                        <button class="boton boton-valido" onclick="adminApp.descargarZipValidos()" title="Descargar únicamente audios validados">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            ZIP (Solo Válidos)
+                        </button>
+                        <button class="boton boton-primario" onclick="adminApp.descargarZip()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" x2="12" y1="15" y2="3"></line>
+                            </svg>
+                            Descargar Todo (ZIP)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Panel de Filtros -->
+                <div class="filtros-panel">
+                    <div class="campo-grupo campo-compacto" style="min-width: 170px;">
+                        <label class="campo-etiqueta" for="filtro-alias">Buscar Alias</label>
+                        <input type="text" id="filtro-alias" class="campo-texto" placeholder="Ej: Hablante_A" onkeyup="if(event.key==='Enter') adminApp.aplicarFiltrosGrabaciones()">
+                    </div>
+                    <div class="campo-grupo campo-compacto" style="min-width: 170px;">
+                        <label class="campo-etiqueta" for="filtro-comando">Filtrar Comando</label>
+                        <select id="filtro-comando" class="campo-select" onchange="adminApp.aplicarFiltrosGrabaciones()">
+                            <option value="">Todos los comandos</option>
+                        </select>
+                    </div>
+                    <div class="campo-grupo campo-compacto" style="min-width: 160px;">
+                        <label class="campo-etiqueta" for="filtro-estado">Estado de Validación</label>
+                        <select id="filtro-estado" class="campo-select" onchange="adminApp.aplicarFiltrosGrabaciones()">
+                            <option value="">Todos los estados</option>
+                            <option value="null">Sin Revisar (?)</option>
+                            <option value="true">Válidos (✓)</option>
+                            <option value="false">Rechazados (✗)</option>
+                        </select>
+                    </div>
+                    <div class="campo-grupo campo-compacto" style="min-width: 160px;">
+                        <label class="campo-etiqueta" for="filtro-orden">Ordenar por</label>
+                        <select id="filtro-orden" class="campo-select" onchange="adminApp.aplicarFiltrosGrabaciones()">
+                            <option value="fecha_desc">Más recientes primero</option>
+                            <option value="fecha_asc">Más antiguos primero</option>
+                            <option value="duracion_desc">Mayor duración</option>
+                            <option value="alias_asc">Alias (A-Z)</option>
+                        </select>
+                    </div>
+                    <div class="campo-grupo campo-compacto" style="align-self: flex-end; display: flex; gap: 8px;">
+                        <button class="boton boton-primario" onclick="adminApp.aplicarFiltrosGrabaciones()">Filtrar</button>
+                        <button class="boton boton-fantasma" onclick="adminApp.limpiarFiltrosGrabaciones()">Limpiar</button>
+                    </div>
+                    <div class="conteo-resultados" id="conteo-resultados-grabaciones">
+                        Cargando grabaciones...
+                    </div>
+                </div>
+
+                <!-- Tabla de Grabaciones -->
+                <div class="tabla-contenedor">
+                    <table class="tabla-datos">
+                        <thead>
+                            <tr>
+                                <th style="width: 44px; text-align: center;">
+                                    <input type="checkbox" id="check-todas-grabaciones" class="campo-checkbox" onchange="adminApp.toggleSeleccionTodasGrabaciones(event)" title="Seleccionar todas las visibles">
+                                </th>
+                                <th>Participante</th>
+                                <th>Comando</th>
+                                <th>Duración</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th style="text-align: right;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-grabaciones">
+                            <!-- Filas dinámicas generadas por admin.js -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Paginación -->
+                <div class="paginacion-barra" id="paginacion-contenedor"></div>
+            </section>
+
+            <!-- =============================================================== -->
+            <!-- TAB 3: COMANDOS                                                 -->
+            <!-- =============================================================== -->
+            <section id="tab-comandos" class="admin-tab">
+                <div class="admin-cabecera">
+                    <div>
+                        <h2 class="admin-titulo-pagina">Gestión de Comandos</h2>
+                        <p class="admin-subtitulo">Define el vocabulario y las palabras que los participantes deben grabar</p>
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="boton boton-secundario" onclick="adminApp.abrirModalLote()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
+                                <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+                            </svg>
+                            Crear en Lote
+                        </button>
+                        <button class="boton boton-primario" onclick="adminApp.abrirModalComando()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Nuevo Comando
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Barra de selección en lote para comandos -->
+                <div class="barra-acciones-comandos" id="acciones-lote-comandos" style="display: none;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <input type="checkbox" id="check-todos-comandos" class="campo-checkbox" onchange="adminApp.toggleSeleccionTodosComandos(event)">
+                        <span id="texto-seleccion-comandos" style="font-weight: 600;">0 comandos seleccionados</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="boton boton-pequeno boton-peligro" onclick="adminApp.eliminarComandosSeleccionados()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            Eliminar Seleccionados
+                        </button>
+                    </div>
+                </div>
+
+                <div class="lista-comandos-admin" id="lista-comandos">
+                    <!-- Tarjetas dinámicas generadas por admin.js -->
+                </div>
+            </section>
+
+            <!-- =============================================================== -->
+            <!-- TAB 4: MULTI-ADMIN                                              -->
+            <!-- =============================================================== -->
+            <section id="tab-admins" class="admin-tab">
+                <div class="admin-cabecera">
+                    <div>
+                        <h2 class="admin-titulo-pagina">Multi-Administrador</h2>
+                        <p class="admin-subtitulo">Tokens de administración y control de acceso jerárquico configurados</p>
+                    </div>
+                </div>
+
+                <div class="info-box-admin">
+                    <div class="info-box-icono">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <strong>Configuración de Múltiples Administradores:</strong>
+                        <p>Los administradores se definen en la variable de entorno <code>ADMIN_TOKENS</code> separados por comas en tu servidor o Render (ejemplo: <code>ADMIN_TOKENS=clave_super,clave_admin2,clave_admin3</code>). El <strong>1er token</strong> tiene rango de <strong>Super Administrador</strong>.</p>
+                    </div>
+                </div>
+
+                <div class="lista-admins" id="lista-admins">
+                    <!-- Dinámico -->
+                </div>
+            </section>
+
+            <!-- =============================================================== -->
+            <!-- TAB 5: CONFIGURACIÓN GLOBAL                                     -->
+            <!-- =============================================================== -->
+            <section id="tab-configuracion" class="admin-tab">
+                <div class="admin-cabecera">
+                    <div>
+                        <h2 class="admin-titulo-pagina">Configuración de Grabación</h2>
+                        <p class="admin-subtitulo">Parámetros del motor de audio y metas de recolección para los participantes</p>
+                    </div>
+                </div>
+
+                <div class="panel-configuracion-card">
+                    <form id="form-config-audio" onsubmit="adminApp.guardarConfiguracionAudio(event)">
+                        <div class="config-form-grid">
+                            <div class="campo-grupo">
+                                <label class="campo-etiqueta" for="conf-duracion">Duración de Grabación por Muestra</label>
+                                <select id="conf-duracion" class="campo-select">
+                                    <option value="1">1 segundo (Palabras muy cortas)</option>
+                                    <option value="2">2 segundos (Estándar controlVoz)</option>
+                                    <option value="3" selected>3 segundos (Recomendado para habla natural)</option>
+                                    <option value="4">4 segundos (Frases compuestas)</option>
+                                    <option value="5">5 segundos (Oraciones)</option>
+                                </select>
+                                <span class="campo-ayuda">Tiempo que el participante grabará cada vez que pulse "Grabar".</span>
+                            </div>
+
+                            <div class="campo-grupo">
+                                <label class="campo-etiqueta" for="conf-tasa">Frecuencia de Muestreo (Fs)</label>
+                                <select id="conf-tasa" class="campo-select">
+                                    <option value="16000" selected>16 000 Hz (Estándar H7 / Reconocimiento de Voz)</option>
+                                    <option value="8000">8 000 Hz (Telefonía básica)</option>
+                                    <option value="22050">22 050 Hz (Media fidelidad)</option>
+                                    <option value="44100">44 100 Hz (Calidad CD)</option>
+                                </select>
+                                <span class="campo-ayuda">El navegador remuestrea automáticamente el audio antes de guardarlo.</span>
+                            </div>
+
+                            <div class="campo-grupo">
+                                <label class="campo-etiqueta" for="conf-meta">Meta de Grabaciones por Comando por Participante</label>
+                                <input type="number" id="conf-meta" class="campo-texto" min="5" max="200" value="40">
+                                <span class="campo-ayuda">Objetivo mostrado a cada usuario en su barra de progreso.</span>
+                            </div>
                         </div>
 
-                        <div class="campo-grupo">
-                            <label class="campo-etiqueta" for="config-tasa">Frecuencia de muestreo</label>
-                            <select id="config-tasa" class="campo-select">
-                                <option value="8000">8 000 Hz &mdash; Baja calidad (telefono)</option>
-                                <option value="16000" selected>16 000 Hz &mdash; Estandar para voz (recomendado)</option>
-                                <option value="22050">22 050 Hz &mdash; Calidad media</option>
-                                <option value="44100">44 100 Hz &mdash; Calidad CD</option>
-                            </select>
-                            <span class="campo-ayuda">Frecuencia de muestreo del archivo WAV resultante.</span>
-                        </div>
-
-                        <div id="config-error" class="mensaje-error oculto"></div>
-
-                        <div class="modal-acciones" style="justify-content: flex-start; margin-top: 24px;">
-                            <button type="submit" id="btn-guardar-config" class="boton boton-primario">Guardar configuracion</button>
-                            <button type="button" id="btn-recargar-config" class="boton boton-fantasma">Actualizar estado</button>
+                        <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+                            <button type="submit" class="boton boton-primario">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                    <polyline points="7 3 7 8 15 8"></polyline>
+                                </svg>
+                                Guardar Configuración
+                            </button>
                         </div>
                     </form>
                 </div>
-            </div>
-        </div>
+            </section>
 
-    </main>
-</div>
+        </main>
 
-<!-- ====================================================================== -->
-<!-- MODAL: Reproductor de audio con espectrograma                          -->
-<!-- ====================================================================== -->
-<div id="modal-reproductor" class="modal-overlay oculto" role="dialog" aria-modal="true" aria-label="Reproductor de audio">
-    <div class="modal-contenido">
-        <div class="modal-cabecera">
-            <div>
-                <h3 class="modal-titulo" id="modal-titulo">Reproduciendo grabacion</h3>
-                <p class="modal-subtitulo" id="modal-subtitulo">---</p>
-            </div>
-            <button id="modal-cerrar" class="boton-icono" aria-label="Cerrar">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
-                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                </svg>
-            </button>
-        </div>
-
-        <audio id="audio-reproductor" controls class="reproductor-audio"></audio>
-
-        <div class="espectrograma-contenedor">
-            <div class="espectrograma-titulo">Espectrograma</div>
-            <canvas id="canvas-espectrograma-modal" class="canvas-espectrograma" width="600" height="200"></canvas>
-        </div>
-
-        <div id="modal-descriptores" class="descriptores-panel">
-            <div class="descriptor-item">
-                <span class="descriptor-nombre">HF/LF Ratio</span>
-                <span class="descriptor-valor" id="modal-desc-hflf">---</span>
-            </div>
-            <div class="descriptor-item">
-                <span class="descriptor-nombre">Energia Alta</span>
-                <span class="descriptor-valor" id="modal-desc-alta">---</span>
-            </div>
-            <div class="descriptor-item">
-                <span class="descriptor-nombre">Energia Baja</span>
-                <span class="descriptor-valor" id="modal-desc-baja">---</span>
-            </div>
-            <div class="descriptor-item">
-                <span class="descriptor-nombre">ZCR</span>
-                <span class="descriptor-valor" id="modal-desc-zcr">---</span>
+        <!-- =============================================================== -->
+        <!-- BARRA FLOTANTE DE ACCIONES EN LOTE (STICKY BOTTOM)              -->
+        <!-- =============================================================== -->
+        <div class="barra-lote" id="barra-lote-grabaciones">
+            <span class="barra-lote-texto" id="texto-lote-grabaciones">0 seleccionadas</span>
+            <div class="barra-lote-acciones">
+                <button class="boton boton-pequeno boton-valido" onclick="adminApp.procesarLoteGrabaciones('validar')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    Marcar Válidas
+                </button>
+                <button class="boton boton-pequeno boton-rechazar" onclick="adminApp.procesarLoteGrabaciones('rechazar')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    Marcar Rechazadas
+                </button>
+                <button class="boton boton-pequeno boton-secundario" onclick="adminApp.procesarLoteGrabaciones('reset')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    Sin Revisar
+                </button>
+                <button class="boton boton-pequeno boton-secundario" onclick="adminApp.descargarZipSeleccionados()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+                    ZIP Selección
+                </button>
+                <button class="boton boton-pequeno boton-peligro" onclick="adminApp.procesarLoteGrabaciones('eliminar')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    Eliminar
+                </button>
             </div>
         </div>
     </div>
-</div>
 
-<!-- ====================================================================== -->
-<!-- MODAL: Crear / Editar comando                                          -->
-<!-- ====================================================================== -->
-<div id="modal-comando" class="modal-overlay oculto" role="dialog" aria-modal="true" aria-label="Editar comando">
-    <div class="modal-contenido modal-pequeno">
-        <div class="modal-cabecera">
-            <h3 class="modal-titulo" id="modal-comando-titulo">Nuevo comando</h3>
-            <button id="modal-comando-cerrar" class="boton-icono" aria-label="Cerrar">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
-                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                </svg>
-            </button>
+    <!-- =================================================================== -->
+    <!-- MODAL: COMANDO INDIVIDUAL (CREAR / EDITAR)                          -->
+    <!-- =================================================================== -->
+    <div id="modal-comando" class="modal-overlay oculto">
+        <div class="modal-contenido modal-pequeno">
+            <div class="modal-cabecera">
+                <div>
+                    <h3 class="modal-titulo" id="modal-comando-titulo">Nuevo Comando</h3>
+                    <p class="modal-subtitulo">Configura los detalles del comando de voz</p>
+                </div>
+                <button class="boton-icono" onclick="adminApp.cerrarModal('modal-comando')">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <form id="form-comando" onsubmit="adminApp.guardarComando(event)">
+                <input type="hidden" id="cmd-id">
+                <div class="campo-grupo">
+                    <label class="campo-etiqueta" for="cmd-nombre">Nombre (Palabra / Frase a grabar)</label>
+                    <input type="text" id="cmd-nombre" class="campo-texto" placeholder="Ej: Adelante" required autocomplete="off">
+                </div>
+                <div class="campo-grupo">
+                    <label class="campo-etiqueta" for="cmd-desc">Instrucción para el participante</label>
+                    <textarea id="cmd-desc" class="campo-textarea" placeholder="Ej: Pronuncia la palabra 'Adelante' con voz clara y tono natural..."></textarea>
+                </div>
+                <div class="campo-grupo campo-fila">
+                    <label class="campo-etiqueta" for="cmd-orden">Orden de aparición</label>
+                    <input type="number" id="cmd-orden" class="campo-texto" style="width: 110px;" min="1" value="1">
+                </div>
+                <div class="campo-grupo campo-fila campo-toggle">
+                    <label class="campo-etiqueta" for="cmd-activo" style="cursor: pointer;">Activo (Visible para participantes)</label>
+                    <input type="checkbox" id="cmd-activo" class="campo-checkbox" checked>
+                </div>
+                <div class="modal-acciones">
+                    <button type="button" class="boton boton-fantasma" onclick="adminApp.cerrarModal('modal-comando')">Cancelar</button>
+                    <button type="submit" class="boton boton-primario">Guardar Comando</button>
+                </div>
+            </form>
         </div>
+    </div>
 
-        <form id="form-comando" autocomplete="off">
-            <input type="hidden" id="cmd-id">
-            <div class="campo-grupo">
-                <label class="campo-etiqueta" for="cmd-nombre">Nombre del comando</label>
-                <input id="cmd-nombre" type="text" class="campo-texto" placeholder="Ej: Adelante" required>
+    <!-- =================================================================== -->
+    <!-- MODAL: CREAR COMANDOS EN LOTE                                       -->
+    <!-- =================================================================== -->
+    <div id="modal-lote" class="modal-overlay oculto">
+        <div class="modal-contenido modal-lote">
+            <div class="modal-cabecera">
+                <div>
+                    <h3 class="modal-titulo">Crear Comandos en Lote</h3>
+                    <p class="modal-subtitulo">Escribe o pega una lista de palabras/frases (una por línea o separadas por comas).</p>
+                </div>
+                <button class="boton-icono" onclick="adminApp.cerrarModal('modal-lote')">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
-            <div class="campo-grupo">
-                <label class="campo-etiqueta" for="cmd-descripcion">Instruccion para el participante</label>
-                <textarea id="cmd-descripcion" class="campo-textarea" rows="3" placeholder="Ej: Pronuncia la palabra Adelante en voz normal..."></textarea>
+            
+            <div class="lote-layout">
+                <div>
+                    <div class="campo-grupo">
+                        <label class="campo-etiqueta" for="lote-texto">Lista de Comandos</label>
+                        <textarea id="lote-texto" class="campo-textarea lote-textarea" placeholder="Adelante&#10;Atras&#10;Izquierda&#10;Derecha&#10;Encender&#10;Apagar" oninput="adminApp.actualizarPreviewLote()"></textarea>
+                    </div>
+                    <div class="campo-grupo campo-fila campo-toggle" style="margin-top: 14px;">
+                        <label class="campo-etiqueta" for="lote-auto-desc" style="text-transform: none; font-size: 0.88rem; cursor: pointer;">Auto-generar instrucción estándar</label>
+                        <input type="checkbox" id="lote-auto-desc" class="campo-checkbox" checked onchange="adminApp.actualizarPreviewLote()">
+                    </div>
+                </div>
+                <div class="lote-preview-container">
+                    <div class="lote-preview-header">
+                        <span class="lote-preview-titulo">Vista Previa y Deduplicación</span>
+                        <span class="badge badge-primario" id="lote-preview-count">0</span>
+                    </div>
+                    <div id="lote-preview-lista" class="lote-preview-lista">
+                        <div class="lote-preview-vacio">Escribe palabras para ver la vista previa en tiempo real.</div>
+                    </div>
+                </div>
             </div>
-            <div class="campo-grupo campo-fila">
-                <label class="campo-etiqueta" for="cmd-orden">Orden</label>
-                <input id="cmd-orden" type="number" class="campo-texto campo-compacto" value="0" min="0">
-            </div>
-            <div class="campo-grupo campo-fila campo-toggle">
-                <label class="campo-etiqueta" for="cmd-activo">Activo</label>
-                <input id="cmd-activo" type="checkbox" class="campo-checkbox" checked>
-            </div>
-            <div id="modal-comando-error" class="mensaje-error oculto"></div>
+
             <div class="modal-acciones">
-                <button type="button" id="btn-cancelar-comando" class="boton boton-fantasma">Cancelar</button>
-                <button type="submit" id="btn-guardar-comando" class="boton boton-primario">Guardar</button>
+                <button type="button" class="boton boton-fantasma" onclick="adminApp.cerrarModal('modal-lote')">Cancelar</button>
+                <button type="button" class="boton boton-primario" id="btn-procesar-lote" onclick="adminApp.procesarLoteComandos()">Crear Comandos</button>
             </div>
-        </form>
-    </div>
-</div>
-
-<!-- ====================================================================== -->
-<!-- MODAL: Crear comandos en lote                                         -->
-<!-- ====================================================================== -->
-<div id="modal-lote" class="modal-overlay oculto" role="dialog" aria-modal="true" aria-label="Crear comandos en lote">
-    <div class="modal-contenido modal-lote">
-        <div class="modal-cabecera">
-            <div>
-                <h3 class="modal-titulo">Crear comandos en lote</h3>
-                <p class="modal-subtitulo">Un comando por línea. Agrega descripción con <code>|</code> separador.</p>
-            </div>
-            <button id="modal-lote-cerrar" class="boton-icono" aria-label="Cerrar">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
-                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                </svg>
-            </button>
-        </div>
-
-        <div class="lote-ejemplo">
-            <span class="lote-ejemplo-titulo">Ejemplo:</span>
-            <pre class="lote-ejemplo-codigo">Adelante
-Atras
-Izquierda | Gira a la izquierda
-Derecha | Gira a la derecha
-Detente | Para el movimiento</pre>
-        </div>
-
-        <div class="campo-grupo">
-            <label class="campo-etiqueta" for="lote-textarea">Comandos <span id="lote-contador" class="lote-contador">0 comandos</span></label>
-            <textarea
-                id="lote-textarea"
-                class="campo-textarea lote-textarea"
-                rows="10"
-                placeholder="Adelante
-Atras
-Izquierda | Gira a la izquierda
-Derecha | Gira a la derecha"
-            ></textarea>
-        </div>
-
-        <div id="lote-progreso" class="lote-progreso oculto">
-            <div class="lote-barra-fondo">
-                <div id="lote-barra-fill" class="lote-barra-fill" style="width:0%"></div>
-            </div>
-            <span id="lote-progreso-texto" class="lote-progreso-texto">Creando...</span>
-        </div>
-
-        <div id="lote-error" class="mensaje-error oculto"></div>
-
-        <div class="modal-acciones">
-            <button type="button" id="btn-lote-cancelar" class="boton boton-fantasma">Cancelar</button>
-            <button type="button" id="btn-lote-crear" class="boton boton-primario">Crear todos</button>
         </div>
     </div>
-</div>
 
-<!-- Toast de notificacion -->
-<div id="toast" class="toast" role="alert" aria-live="polite"></div>
+    <!-- NOTIFICACIONES TOAST -->
+    <div id="toast" class="toast"></div>
 
-<!-- Scripts -->
-<script src="js/dsp.js"></script>
-<script src="js/espectrograma.js"></script>
-<script src="js/admin.js"></script>
+    <!-- SCRIPTS MODULARES -->
+    <script src="/js/dsp.js"></script>
+    <script src="/js/espectrograma.js"></script>
+    <script src="/js/admin.js"></script>
 </body>
 </html>

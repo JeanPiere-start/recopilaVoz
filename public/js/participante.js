@@ -1,3 +1,11 @@
+/**
+ * participante.js — Controlador para la vista del Participante en RecopilaVoz
+ * Permite registrar grabaciones para cada comando activo, visualizar el espectrograma
+ * STFT en tiempo real y calcular los descriptores del experimento H7.
+ */
+
+'use strict';
+
 document.addEventListener('DOMContentLoaded', () => {
     // Referencias a elementos del DOM
     const formIngreso = document.getElementById('form-ingreso');
@@ -5,8 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const pantallaIngreso = document.getElementById('pantalla-ingreso');
     const pantallaPrincipal = document.getElementById('pantalla-principal');
     const listaComandos = document.getElementById('lista-comandos');
+    const panelVacio = document.getElementById('panel-vacio');
     const panelGrabacion = document.getElementById('panel-grabacion');
-    const comandoNombre = document.getElementById('comando-badge');
+    const comandoBadge = document.getElementById('comando-badge');
     const comandoInstruccion = document.getElementById('comando-instruccion');
     const btnGrabar = document.getElementById('btn-grabar');
     const btnDetener = document.getElementById('btn-detener');
@@ -14,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const vuBarra = document.getElementById('vu-barra');
     const panelResultado = document.getElementById('panel-resultado');
     const canvasResultado = document.getElementById('canvas-espectrograma-resultado');
+    const resultadoDuracion = document.getElementById('resultado-duracion');
     const descHflf = document.getElementById('desc-hflf');
     const descAlta = document.getElementById('desc-alta');
     const descBaja = document.getElementById('desc-baja');
@@ -21,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnRepetir = document.getElementById('btn-repetir');
     const btnConfirmar = document.getElementById('btn-confirmar');
     const cargandoSubida = document.getElementById('cargando-subida');
+    const temporizador = document.getElementById('temporizador');
     const temporizadorBarra = document.getElementById('temporizador-barra');
     const temporizadorTexto = document.getElementById('temporizador-texto');
     const estadoGrabacion = document.getElementById('estado-grabacion');
@@ -33,91 +44,120 @@ document.addEventListener('DOMContentLoaded', () => {
     const progresoTotal = document.getElementById('progreso-total');
     const etiquetaAliasHeader = document.getElementById('etiqueta-alias-header');
 
-    // Estado de la aplicacion
-    let alias = sessionStorage.getItem('alias') || '';
+    // Estado local del participante
+    let alias = sessionStorage.getItem('recopilaVoz_alias') || '';
     let comandos = [];
     let comandoSeleccionado = null;
     let grabador = null;
     let audioBlobTemporal = null;
     let duracionTemporal = 0;
+    let metaPorComando = 40;
+    let conteoComandosUsuario = {};
     
-    // Configuracion de grabacion (se obtiene del servidor)
-    let configGrabacion = { duracion_s: 3, tasa_hz: 16000 };
+    // Configuración de audio obtenida del backend
+    let configGrabacion = { duracion_s: 3, tasa_hz: 16000, meta_por_comando: 40 };
     
     // Espectrograma en vivo
     let intervaloVivo = null;
     let analyserNode = null;
-    let indiceColumnaVivo = 0;
 
-    // Inicializacion
+    // Inicialización de sesión si ya existe
     if (alias) {
         iniciarSesion(alias);
     }
 
-    // Inicializar canvas negro
+    // Inicializar canvas de espectrograma en vivo en negro
     if (canvasVivo) {
         const ctx = canvasVivo.getContext('2d');
-        ctx.fillStyle = 'black';
+        ctx.fillStyle = '#080b12';
         ctx.fillRect(0, 0, canvasVivo.width, canvasVivo.height);
     }
 
     // Event Listeners
-    formIngreso.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const nuevoAlias = aliasInput.value.trim();
-        if (nuevoAlias) {
-            iniciarSesion(nuevoAlias);
-        }
-    });
+    if (formIngreso) {
+        formIngreso.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nuevoAlias = aliasInput.value.trim();
+            if (nuevoAlias) {
+                iniciarSesion(nuevoAlias);
+            }
+        });
+    }
 
-    btnSalir.addEventListener('click', () => {
-        sessionStorage.removeItem('alias');
-        location.reload();
-    });
+    if (btnSalir) {
+        btnSalir.addEventListener('click', () => {
+            sessionStorage.removeItem('recopilaVoz_alias');
+            location.reload();
+        });
+    }
 
-    btnRecargarGrabaciones.addEventListener('click', cargarMisGrabaciones);
+    if (btnRecargarGrabaciones) {
+        btnRecargarGrabaciones.addEventListener('click', cargarMisGrabaciones);
+    }
 
-    btnGrabar.addEventListener('click', iniciarGrabacion);
-    btnDetener.addEventListener('click', detenerGrabacion);
-    btnRepetir.addEventListener('click', () => {
-        panelResultado.style.display = 'none';
-        btnGrabar.style.display = 'block';
-        btnDetener.style.display = 'none';
-        estadoGrabacion.textContent = 'Listo';
-        audioBlobTemporal = null;
-        limpiarTemporizador();
-        limpiarCanvasVivo();
-    });
+    if (btnGrabar) btnGrabar.addEventListener('click', iniciarGrabacion);
+    if (btnDetener) btnDetener.addEventListener('click', detenerGrabacion);
 
-    btnConfirmar.addEventListener('click', subirGrabacion);
+    if (btnRepetir) {
+        btnRepetir.addEventListener('click', () => {
+            if (panelResultado) panelResultado.classList.add('oculto');
+            if (btnGrabar) {
+                btnGrabar.style.display = 'inline-flex';
+                btnGrabar.disabled = false;
+            }
+            if (btnDetener) btnDetener.disabled = true;
+            if (estadoGrabacion) {
+                estadoGrabacion.textContent = 'Listo';
+                estadoGrabacion.className = 'estado-etiqueta estado-listo';
+            }
+            audioBlobTemporal = null;
+            limpiarTemporizador();
+            limpiarCanvasVivo();
+        });
+    }
 
-    const META_POR_COMANDO = 40;
-    let conteoComandosUsuario = {};
+    if (btnConfirmar) btnConfirmar.addEventListener('click', subirGrabacion);
 
-    // Funciones
+    // =======================================================================
+    // FUNCIONES PRINCIPALES
+    // =======================================================================
+
     async function cargarConfigGrabacion() {
         try {
             const res = await fetch('/api/config-grabacion');
             const data = await res.json();
-            configGrabacion = data.config || configGrabacion;
-            // Actualizar texto del boton
+            if (data.config) {
+                configGrabacion = data.config;
+                metaPorComando = data.config.meta_por_comando || 40;
+            }
             if (btnGrabar) {
                 btnGrabar.innerHTML = `<span class="boton-grabar-punto"></span> Grabar (${configGrabacion.duracion_s} seg)`;
             }
         } catch (e) {
-            console.warn('No se pudo cargar config de grabacion, usando valores por defecto');
+            console.warn('Usando configuración de audio por defecto');
         }
     }
 
     function iniciarSesion(nuevoAlias) {
         alias = nuevoAlias;
-        sessionStorage.getItem('alias') || sessionStorage.setItem('alias', alias);
-        pantallaIngreso.style.display = 'none';
-        pantallaPrincipal.style.display = 'block';
-        if (etiquetaAliasHeader) etiquetaAliasHeader.textContent = alias;
-        cargarConfigGrabacion();
-        cargarComandos();
-        cargarMisGrabaciones();
+        sessionStorage.setItem('recopilaVoz_alias', alias);
+        
+        if (pantallaIngreso) {
+            pantallaIngreso.classList.remove('activa');
+            pantallaIngreso.style.display = 'none';
+        }
+        if (pantallaPrincipal) {
+            pantallaPrincipal.classList.add('activa');
+            pantallaPrincipal.style.display = 'flex';
+        }
+        if (etiquetaAliasHeader) {
+            etiquetaAliasHeader.textContent = alias;
+        }
+
+        cargarConfigGrabacion().then(() => {
+            cargarComandos();
+            cargarMisGrabaciones();
+        });
     }
 
     async function cargarComandos() {
@@ -127,15 +167,22 @@ document.addEventListener('DOMContentLoaded', () => {
             comandos = data.comandos || [];
             renderizarComandos();
         } catch (error) {
-            mostrarToast('Error al cargar comandos', 'error');
+            mostrarToast('Error al cargar la lista de comandos', 'error');
         }
     }
 
     function renderizarComandos() {
+        if (!listaComandos) return;
         listaComandos.innerHTML = '';
+
+        if (comandos.length === 0) {
+            listaComandos.innerHTML = '<div class="cargando-comandos">No hay comandos activos en este momento.</div>';
+            return;
+        }
+
         comandos.forEach(cmd => {
             const conteo = conteoComandosUsuario[cmd.nombre] || 0;
-            const esCompletado = conteo >= META_POR_COMANDO;
+            const esCompletado = conteo >= metaPorComando;
             
             const item = document.createElement('div');
             item.className = `item-comando ${esCompletado ? 'completado' : 'pendiente'}`;
@@ -145,12 +192,13 @@ document.addEventListener('DOMContentLoaded', () => {
             item.dataset.id = cmd.id;
             item.innerHTML = `
                 <span class="cmd-nombre-texto">${cmd.nombre}</span>
-                <span class="cmd-conteo-badge">${conteo}/${META_POR_COMANDO}</span>
+                <span class="cmd-conteo-badge">${conteo}/${metaPorComando}</span>
             `;
             item.addEventListener('click', () => seleccionarComando(cmd, item));
             listaComandos.appendChild(item);
         });
-        actualizarProgreso();
+
+        actualizarProgresoGlobal();
     }
 
     function seleccionarComando(cmd, elementoHtml) {
@@ -159,32 +207,42 @@ document.addEventListener('DOMContentLoaded', () => {
         comandoSeleccionado = cmd;
 
         const conteo = conteoComandosUsuario[cmd.nombre] || 0;
-        panelGrabacion.style.display = 'block';
-        if (comandoNombre) {
-            if (conteo >= META_POR_COMANDO) {
-                comandoNombre.textContent = `${cmd.nombre} (¡Meta alcanzada! ${conteo}/${META_POR_COMANDO})`;
+        
+        if (panelVacio) panelVacio.classList.remove('activo-panel');
+        if (panelGrabacion) panelGrabacion.classList.add('activo-panel');
+
+        if (comandoBadge) {
+            if (conteo >= metaPorComando) {
+                comandoBadge.textContent = `${cmd.nombre} (Meta completada: ${conteo}/${metaPorComando})`;
             } else {
-                comandoNombre.textContent = `${cmd.nombre} (Grabación ${conteo + 1} de ${META_POR_COMANDO})`;
+                comandoBadge.textContent = `${cmd.nombre} (Grabación ${conteo + 1} de ${metaPorComando})`;
             }
         }
         if (comandoInstruccion) {
-            comandoInstruccion.textContent = `${cmd.descripcion} (Objetivo: ${META_POR_COMANDO} grabaciones)`;
+            comandoInstruccion.textContent = cmd.descripcion || `Pronuncia la palabra "${cmd.nombre}" en voz clara.`;
         }
-        panelResultado.style.display = 'none';
-        btnGrabar.style.display = 'block';
-        btnDetener.style.display = 'none';
-        estadoGrabacion.textContent = 'Listo';
+
+        if (panelResultado) panelResultado.classList.add('oculto');
+        if (btnGrabar) {
+            btnGrabar.style.display = 'inline-flex';
+            btnGrabar.disabled = false;
+        }
+        if (btnDetener) btnDetener.disabled = true;
+        if (estadoGrabacion) {
+            estadoGrabacion.textContent = 'Listo para grabar';
+            estadoGrabacion.className = 'estado-etiqueta estado-listo';
+        }
         
         limpiarTemporizador();
         limpiarCanvasVivo();
     }
 
-    function actualizarProgreso() {
+    function actualizarProgresoGlobal() {
         let totalGrabados = 0;
         comandos.forEach(cmd => {
-            totalGrabados += Math.min(META_POR_COMANDO, conteoComandosUsuario[cmd.nombre] || 0);
+            totalGrabados += Math.min(metaPorComando, conteoComandosUsuario[cmd.nombre] || 0);
         });
-        const totalMeta = comandos.length * META_POR_COMANDO;
+        const totalMeta = comandos.length * metaPorComando;
         const porcentaje = totalMeta > 0 ? (totalGrabados / totalMeta) * 100 : 0;
         
         if (barraProgreso) barraProgreso.style.width = `${porcentaje}%`;
@@ -192,18 +250,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (progresoTotal) progresoTotal.textContent = totalMeta;
     }
 
+    // =======================================================================
+    // CICLO DE GRABACIÓN & DSP
+    // =======================================================================
     async function iniciarGrabacion() {
         if (!comandoSeleccionado) return;
         
-        estadoGrabacion.textContent = 'Grabando...';
-        btnGrabar.style.display = 'none';
-        btnDetener.style.display = 'block';
+        if (estadoGrabacion) {
+            estadoGrabacion.textContent = 'Grabando...';
+            estadoGrabacion.className = 'estado-etiqueta estado-grabando';
+        }
+        if (btnGrabar) btnGrabar.disabled = true;
+        if (btnDetener) btnDetener.disabled = false;
         
         grabador = new Grabador(configGrabacion.tasa_hz);
         
         grabador.onNivelVoz = (nivel) => {
             if (vuBarra) {
-                vuBarra.style.width = `${Math.min(100, nivel * 100)}%`;
+                vuBarra.style.width = `${Math.min(100, Math.round(nivel * 100))}%`;
             }
         };
 
@@ -212,35 +276,55 @@ document.addEventListener('DOMContentLoaded', () => {
             iniciarEspectrogramaVivo();
             iniciarTemporizador(configGrabacion.duracion_s);
         } catch (err) {
-            mostrarToast('Error al acceder al microfono', 'error');
-            estadoGrabacion.textContent = 'Listo';
-            btnGrabar.style.display = 'block';
-            btnDetener.style.display = 'none';
+            mostrarToast('No se pudo acceder al micrófono: ' + err.message, 'error');
+            if (estadoGrabacion) {
+                estadoGrabacion.textContent = 'Error de micrófono';
+                estadoGrabacion.className = 'estado-etiqueta';
+            }
+            if (btnGrabar) btnGrabar.disabled = false;
+            if (btnDetener) btnDetener.disabled = true;
         }
     }
 
     function detenerGrabacion() {
         if (grabador) {
-            estadoGrabacion.textContent = 'Procesando...';
+            if (estadoGrabacion) {
+                estadoGrabacion.textContent = 'Procesando señal...';
+                estadoGrabacion.className = 'estado-etiqueta';
+            }
             detenerEspectrogramaVivo();
             
-            grabador.onFinalizar = async (blob, audioData, sampleRate) => {
+            grabador.onFinalizar = (blob, audioData, sampleRate) => {
                 audioBlobTemporal = blob;
                 duracionTemporal = audioData.length / sampleRate;
                 
-                // Procesamiento
-                const espectrograma = DSP.espectrogramaSTFT(audioData, 512, 256);
-                Espectrograma.dibujarEspectrograma(canvasResultado, espectrograma, sampleRate);
+                // Cálculo de Espectrograma STFT
+                const stftFunc = (window.DSP && window.DSP.espectrogramaSTFT) || espectrogramaSTFT;
+                const descFunc = (window.DSP && window.DSP.descriptoresEspectrales) || descriptoresEspectrales;
+                const drawFunc = (window.Espectrograma && window.Espectrograma.dibujarEspectrograma) || window.dibujarEspectrograma || dibujarEspectrograma;
+
+                const espectrograma = stftFunc(audioData, 512, 128, sampleRate);
+                drawFunc(canvasResultado, espectrograma, { dbMin: -70, dbMax: 0, mostrarEjes: true });
                 
-                const descriptores = DSP.descriptoresEspectrales(espectrograma, sampleRate);
-                descHflf.textContent = descriptores.hflfRatio.toFixed(3);
-                descAlta.textContent = descriptores.energiaAlta.toFixed(3);
-                descBaja.textContent = descriptores.energiaBaja.toFixed(3);
-                descZcr.textContent = (DSP.tasaCrucesPorCero(audioData) * 100).toFixed(2);
+                // Cálculo de Descriptores Espectrales del Experimento H7
+                const descriptores = descFunc(audioData, sampleRate);
+                if (descriptores) {
+                    if (descHflf) descHflf.textContent = descriptores.hflfRatio.toFixed(3);
+                    if (descAlta) descAlta.textContent = (descriptores.energiaAlta * 100).toFixed(1) + '%';
+                    if (descBaja) descBaja.textContent = (descriptores.energiaBaja * 100).toFixed(1) + '%';
+                    if (descZcr) descZcr.textContent = descriptores.zcr.toFixed(4);
+                }
                 
-                panelResultado.style.display = 'block';
-                btnDetener.style.display = 'none';
-                estadoGrabacion.textContent = `Grabacion finalizada: ${duracionTemporal.toFixed(2)} s`;
+                if (resultadoDuracion) {
+                    resultadoDuracion.textContent = `${duracionTemporal.toFixed(2)} segundos @ ${sampleRate} Hz`;
+                }
+
+                if (panelResultado) panelResultado.classList.remove('oculto');
+                if (btnDetener) btnDetener.disabled = true;
+                if (estadoGrabacion) {
+                    estadoGrabacion.textContent = `Grabación lista (${duracionTemporal.toFixed(2)}s)`;
+                    estadoGrabacion.className = 'estado-etiqueta estado-listo';
+                }
                 limpiarTemporizador();
             };
             
@@ -254,24 +338,26 @@ document.addEventListener('DOMContentLoaded', () => {
         
         analyserNode = grabador.audioCtx.createAnalyser();
         analyserNode.fftSize = 512;
-        if (grabador.mediaStreamSource) {
-            grabador.mediaStreamSource.connect(analyserNode);
+        if (grabador.analizador) {
+            grabador.analizador.connect(analyserNode);
         }
         
-        indiceColumnaVivo = 0;
         const arrayDatos = new Float32Array(analyserNode.fftSize);
-        
+        const stftColFunc = (window.Espectrograma && window.Espectrograma.dibujarColumnaEnVivo) || dibujarColumnaEnVivo;
+        const fftFunc = (window.DSP && window.DSP.fftReal) || fftReal;
+        const magFunc = (window.DSP && window.DSP.magnitudFFT) || magnitudFFT;
+        const potFunc = (window.DSP && window.DSP.potenciaEspectral) || potenciaEspectral;
+
         intervaloVivo = setInterval(() => {
-            if (!analyserNode) return;
+            if (!analyserNode || !canvasVivo) return;
             analyserNode.getFloatTimeDomainData(arrayDatos);
             
-            // Calculo FFT
-            const { re, im } = DSP.fftReal(arrayDatos);
-            const magnitudes = DSP.magnitudFFT(re, im);
-            const potencia = DSP.potenciaEspectral(magnitudes);
+            const { re, im } = fftFunc(arrayDatos);
+            const magnitudes = magFunc(re, im);
+            const potencia = potFunc(magnitudes);
             
-            Espectrograma.dibujarColumnaEnVivo(canvasVivo, potencia);
-        }, 100);
+            stftColFunc(canvasVivo, potencia, { dbMin: -75, dbMax: 0, anchoColumna: 3 });
+        }, 60);
     }
 
     function detenerEspectrogramaVivo() {
@@ -288,47 +374,57 @@ document.addEventListener('DOMContentLoaded', () => {
     function limpiarCanvasVivo() {
         if (canvasVivo) {
             const ctx = canvasVivo.getContext('2d');
-            ctx.fillStyle = 'black';
+            ctx.fillStyle = '#080b12';
             ctx.fillRect(0, 0, canvasVivo.width, canvasVivo.height);
         }
     }
 
     function iniciarTemporizador(segundos) {
-        if(temporizadorBarra) temporizadorBarra.style.transition = `width ${segundos}s linear`;
-        setTimeout(() => {
-            if(temporizadorBarra) temporizadorBarra.style.width = '100%';
-        }, 50);
+        if (temporizador) temporizador.classList.remove('oculto');
+        if (temporizadorBarra) {
+            temporizadorBarra.style.transition = `width ${segundos}s linear`;
+            setTimeout(() => {
+                temporizadorBarra.style.width = '100%';
+            }, 30);
+        }
         
         let restante = segundos;
-        if(temporizadorTexto) temporizadorTexto.textContent = `${restante}s`;
+        if (temporizadorTexto) temporizadorTexto.textContent = `${restante}.0s`;
         
-        const intervalo = setInterval(() => {
-            restante--;
-            if (restante <= 0) {
-                clearInterval(intervalo);
-                if (estadoGrabacion.textContent === 'Grabando...') {
+        const paso = 100;
+        let transcurrido = 0;
+        const intTimer = setInterval(() => {
+            transcurrido += paso;
+            const rest = Math.max(0, (segundos * 1000 - transcurrido) / 1000);
+            if (temporizadorTexto) temporizadorTexto.textContent = `${rest.toFixed(1)}s`;
+
+            if (transcurrido >= segundos * 1000) {
+                clearInterval(intTimer);
+                if (estadoGrabacion && estadoGrabacion.textContent.includes('Grabando')) {
                     detenerGrabacion();
                 }
-            } else {
-                if(temporizadorTexto) temporizadorTexto.textContent = `${restante}s`;
             }
-        }, 1000);
+        }, paso);
     }
 
     function limpiarTemporizador() {
-        if(temporizadorBarra) {
+        if (temporizadorBarra) {
             temporizadorBarra.style.transition = 'none';
             temporizadorBarra.style.width = '0%';
         }
-        if(temporizadorTexto) temporizadorTexto.textContent = '3s';
-        if(vuBarra) vuBarra.style.width = '0%';
+        if (temporizadorTexto) temporizadorTexto.textContent = `${configGrabacion.duracion_s}.0s`;
+        if (vuBarra) vuBarra.style.width = '0%';
+        if (temporizador) temporizador.classList.add('oculto');
     }
 
+    // =======================================================================
+    // SUBIDA Y SINCRONIZACIÓN
+    // =======================================================================
     async function subirGrabacion() {
         if (!audioBlobTemporal || !comandoSeleccionado) return;
         
-        cargandoSubida.style.display = 'block';
-        btnConfirmar.disabled = true;
+        if (cargandoSubida) cargandoSubida.classList.remove('oculto');
+        if (btnConfirmar) btnConfirmar.disabled = true;
         
         const formData = new FormData();
         formData.append('audio', audioBlobTemporal, `${alias}_${comandoSeleccionado.nombre}.wav`);
@@ -344,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             
             if (data.exito) {
-                mostrarToast('Grabacion subida con exito', 'exito');
+                mostrarToast('Grabación guardada con éxito', 'exito');
                 
                 // Actualizar conteo local inmediatamente
                 const cmdNombre = comandoSeleccionado.nombre;
@@ -352,26 +448,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderizarComandos();
                 
                 const nuevoConteo = conteoComandosUsuario[cmdNombre];
-                if (comandoNombre) {
-                    if (nuevoConteo >= META_POR_COMANDO) {
-                        comandoNombre.textContent = `${cmdNombre} (¡Meta alcanzada! ${nuevoConteo}/${META_POR_COMANDO})`;
+                if (comandoBadge) {
+                    if (nuevoConteo >= metaPorComando) {
+                        comandoBadge.textContent = `${cmdNombre} (Meta completada: ${nuevoConteo}/${metaPorComando})`;
                     } else {
-                        comandoNombre.textContent = `${cmdNombre} (Grabación ${nuevoConteo + 1} de ${META_POR_COMANDO})`;
+                        comandoBadge.textContent = `${cmdNombre} (Grabación ${nuevoConteo + 1} de ${metaPorComando})`;
                     }
                 }
                 
                 cargarMisGrabaciones();
-                
-                // Reset panel
-                btnRepetir.click();
+                if (btnRepetir) btnRepetir.click();
             } else {
-                mostrarToast(data.error || 'Error al subir grabacion', 'error');
+                mostrarToast(data.error || 'Error al guardar la grabación', 'error');
             }
         } catch (error) {
-            mostrarToast('Error de red al subir', 'error');
+            mostrarToast('Error de red al conectar con el servidor', 'error');
         } finally {
-            cargandoSubida.style.display = 'none';
-            btnConfirmar.disabled = false;
+            if (cargandoSubida) cargandoSubida.classList.add('oculto');
+            if (btnConfirmar) btnConfirmar.disabled = false;
         }
     }
 
@@ -379,35 +473,41 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch(`/api/mis-audios?alias=${encodeURIComponent(alias)}`);
             const data = await res.json();
-            listaMisGrabaciones.innerHTML = '';
+            if (!listaMisGrabaciones) return;
             
+            listaMisGrabaciones.innerHTML = '';
             conteoComandosUsuario = {};
-            if (data.grabaciones) {
+
+            if (data.grabaciones && data.grabaciones.length > 0) {
                 data.grabaciones.forEach(grab => {
                     conteoComandosUsuario[grab.comando] = (conteoComandosUsuario[grab.comando] || 0) + 1;
                     
                     const div = document.createElement('div');
                     div.className = 'tarjeta-grabacion';
                     div.innerHTML = `
-                        <h4>Comando: ${grab.comando}</h4>
-                        <p>Duración: ${grab.duracion_s} s</p>
-                        <p>Fecha: ${new Date(grab.created_at).toLocaleString()}</p>
-                        <audio controls src="${grab.url_audio}"></audio>
+                        <div class="tarjeta-grabacion-info">
+                            <h4>${grab.comando}</h4>
+                            <p>${grab.duracion_s ? grab.duracion_s.toFixed(2) + 's' : '-'} • ${new Date(grab.created_at).toLocaleTimeString()}</p>
+                        </div>
+                        <audio controls src="${grab.url_audio}" preload="metadata"></audio>
                     `;
                     listaMisGrabaciones.appendChild(div);
                 });
+            } else {
+                listaMisGrabaciones.innerHTML = '<p class="lista-vacia">Aún no tienes grabaciones registradas. Selecciona un comando para comenzar.</p>';
             }
             renderizarComandos();
         } catch (error) {
-            mostrarToast('Error al cargar mis grabaciones', 'error');
+            mostrarToast('Error al cargar grabaciones previas', 'error');
         }
     }
 
-    function mostrarToast(mensaje, tipo) {
+    function mostrarToast(mensaje, tipo = 'info') {
+        if (!toast) return;
         toast.textContent = mensaje;
-        toast.className = `toast ${tipo} visible`;
+        toast.className = `toast visible ${tipo}`;
         setTimeout(() => {
             toast.classList.remove('visible');
-        }, 3000);
+        }, 3200);
     }
 });

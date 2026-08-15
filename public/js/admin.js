@@ -1,684 +1,1277 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // Referencias
-    const formAuth = document.getElementById('form-auth');
-    const tokenInput = document.getElementById('token-input');
-    const pantallaAuth = document.getElementById('pantalla-auth');
-    const panelAdmin = document.getElementById('panel-admin');
-    const tabs = document.querySelectorAll('.sidebar-item[data-tab]');
-    const tabContents = document.querySelectorAll('.admin-tab');
-    const btnCerrarSesion = document.getElementById('btn-cerrar-sesion');
-    const toast = document.getElementById('toast');
+/**
+ * admin.js — Controlador del Panel de Administración de RecopilaVoz
+ * Incluye: Multi-Admin, reproductor inline con espectrograma STFT y cursor sincronizado,
+ * cálculo de métricas DSP en cliente, acciones en lote y gestión avanzada de comandos.
+ */
 
-    // Resumen
-    const statGrabaciones = document.getElementById('stat-total-grabaciones');
-    const statParticipantes = document.getElementById('stat-total-participantes');
-    const statComandos = document.getElementById('stat-total-comandos');
-    const graficoComandos = document.getElementById('grafico-comandos');
-    const tablaParticipantes = document.getElementById('tabla-participantes');
+'use strict';
 
-    // Grabaciones
-    const tablaGrabacionesCuerpo = document.getElementById('tabla-grabaciones-cuerpo');
-    const filtroAlias = document.getElementById('filtro-alias');
-    const filtroComando = document.getElementById('filtro-comando');
-    const btnFiltrar = document.getElementById('btn-filtrar');
-    const btnLimpiarFiltros = document.getElementById('btn-limpiar-filtros');
+const adminApp = (() => {
+    
+    // =======================================================================
+    // ESTADO GLOBAL
+    // =======================================================================
+    let token = localStorage.getItem('recopilaVoz_adminToken') || '';
+    let esSuperAdmin = false;
 
-    // Comandos
-    const listaComandosAdmin = document.getElementById('lista-comandos-admin');
-    const btnNuevoComando = document.getElementById('btn-nuevo-comando');
-    const modalComando = document.getElementById('modal-comando');
-    const btnCerrarModalComando = document.getElementById('modal-comando-cerrar');
-    const btnCancelarComando = document.getElementById('btn-cancelar-comando');
-    const formComando = document.getElementById('form-comando');
+    let datos = {
+        stats: {},
+        grabaciones: [],
+        comandos: [],
+        admins: [],
+        configGrabacion: { duracion_s: 3, tasa_hz: 16000, meta_por_comando: 40 },
+        totalGrabaciones: 0
+    };
+    
+    let filtros = {
+        alias: '',
+        comando: '',
+        estado: '',
+        ordenarPor: 'fecha_desc',
+        pagina: 0,
+        limite: 100
+    };
 
-    // Exportaciones
-    const btnExportarJson = document.getElementById('btn-exportar-json');
-    const btnExportarCsv = document.getElementById('btn-exportar-csv');
-    const btnDescargarZip = document.getElementById('btn-descargar-todo-zip');
-    const btnDescargarFiltroZip = document.getElementById('btn-descargar-filtro-zip');
+    let seleccionGrabaciones = new Set();
+    let seleccionComandos = new Set();
+    
+    let reproductorActual = null; // ID de la grabación abierta en la tabla
+    let audioContextGlobal = null;
 
-    // Reproductor Modal
-    const modalReproductor = document.getElementById('modal-reproductor');
-    const btnCerrarReproductor = document.getElementById('modal-cerrar');
-    const audioReproductor = document.getElementById('audio-reproductor');
-    const canvasModal = document.getElementById('canvas-espectrograma-modal');
-
-    let token = sessionStorage.getItem('adminToken') || '';
-    let currentPage = 1;
-
-    // =========================================================
-    // AUTENTICACION
-    // =========================================================
-    if (token) {
-        mostrarPanelAdmin();
+    // =======================================================================
+    // INICIALIZACIÓN Y AUTENTICACIÓN
+    // =======================================================================
+    async function init() {
+        configurarEventosModales();
+        if (token) {
+            const authResult = await verificarToken(token);
+            if (authResult.valido) {
+                esSuperAdmin = authResult.esSuperAdmin;
+                actualizarRolUI();
+                mostrarPantalla('pantalla-admin');
+                cargarDatosIniciales();
+            } else {
+                cerrarSesion();
+            }
+        } else {
+            mostrarPantalla('pantalla-auth');
+        }
     }
 
-    formAuth.addEventListener('submit', async (e) => {
+    async function verificarToken(t) {
+        try {
+            const res = await fetch('/api/admin/verificar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: t })
+            });
+            const data = await res.json();
+            return { valido: !!data.valido, esSuperAdmin: !!data.esSuperAdmin };
+        } catch (e) {
+            return { valido: false, esSuperAdmin: false };
+        }
+    }
+
+    async function iniciarSesion(e) {
         e.preventDefault();
-        const inputToken = tokenInput.value.trim();
-        if (inputToken) {
-            try {
-                const res = await fetch('/api/admin/verificar', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: inputToken })
-                });
-                const data = await res.json();
-                if (data.valido) {
-                    token = inputToken;
-                    sessionStorage.setItem('adminToken', token);
-                    mostrarPanelAdmin();
-                } else {
-                    mostrarToast('Token invalido', 'error');
-                }
-            } catch (err) {
-                mostrarToast('Error de conexion', 'error');
-            }
+        const input = document.getElementById('input-token').value.trim();
+        if (!input) return;
+
+        const btn = e.target.querySelector('button');
+        if (btn) btn.disabled = true;
+        
+        const authResult = await verificarToken(input);
+        if (authResult.valido) {
+            token = input;
+            esSuperAdmin = authResult.esSuperAdmin;
+            localStorage.setItem('recopilaVoz_adminToken', token);
+            mostrarToast('Acceso concedido al panel de administración', 'exito');
+            actualizarRolUI();
+            mostrarPantalla('pantalla-admin');
+            cargarDatosIniciales();
+        } else {
+            mostrarToast('Token de administrador inválido', 'error');
         }
-    });
-
-    btnCerrarSesion.addEventListener('click', () => {
-        sessionStorage.removeItem('adminToken');
-        location.reload();
-    });
-
-    // =========================================================
-    // NAVEGACION TABS
-    // =========================================================
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('activo'));
-            tab.classList.add('activo');
-
-            const target = tab.dataset.tab;
-            tabContents.forEach(c => {
-                if (c.id === target) {
-                    c.classList.add('activo-tab');
-                } else {
-                    c.classList.remove('activo-tab');
-                }
-            });
-            cargarDatosTab(target);
-        });
-    });
-
-    function mostrarPanelAdmin() {
-        pantallaAuth.style.display = 'none';
-        panelAdmin.style.display = 'flex';
-        if (tabs.length > 0) tabs[0].click();
-        poblarFiltrosComandos();
+        if (btn) btn.disabled = false;
     }
 
-    async function peticionAuth(url, options = {}) {
-        options.headers = options.headers || {};
-        options.headers['X-Admin-Token'] = token;
-        const res = await fetch(url, options);
-        if (res.status === 401 || res.status === 403) {
-            btnCerrarSesion.click();
-            throw new Error('No autorizado');
+    function actualizarRolUI() {
+        const badge = document.getElementById('sidebar-rol-badge');
+        if (badge) {
+            badge.textContent = esSuperAdmin ? 'Super Admin' : 'Admin';
+            badge.className = esSuperAdmin ? 'sidebar-rol-tag badge-super' : 'sidebar-rol-tag';
         }
-        return res;
     }
 
-    function cargarDatosTab(tabId) {
-        if (tabId === 'tab-resumen') cargarResumen();
-        else if (tabId === 'tab-grabaciones') cargarGrabaciones();
-        else if (tabId === 'tab-comandos') cargarComandos();
-        else if (tabId === 'tab-configuracion') cargarConfigGrabacion();
+    function cerrarSesion() {
+        token = '';
+        esSuperAdmin = false;
+        localStorage.removeItem('recopilaVoz_adminToken');
+        mostrarPantalla('pantalla-auth');
+        const input = document.getElementById('input-token');
+        if (input) input.value = '';
     }
 
-    // =========================================================
-    // TAB: RESUMEN
-    // =========================================================
-    const btnActualizarStats = document.getElementById('btn-actualizar-stats');
-    if (btnActualizarStats) {
-        btnActualizarStats.addEventListener('click', cargarResumen);
+    // =======================================================================
+    // UTILIDADES & COMUNICACIÓN HTTP
+    // =======================================================================
+    function mostrarPantalla(id) {
+        document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
+        const target = document.getElementById(id);
+        if (target) target.classList.add('activa');
     }
 
-    async function cargarResumen() {
+    function cambiarTab(tabId) {
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('activo-tab'));
+        const tabTarget = document.getElementById(`tab-${tabId}`);
+        if (tabTarget) tabTarget.classList.add('activo-tab');
+        
+        document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('activo'));
+        if (window.event && window.event.currentTarget && window.event.currentTarget.classList.contains('sidebar-item')) {
+            window.event.currentTarget.classList.add('activo');
+        }
+
+        if (tabId === 'grabaciones') cargarGrabaciones();
+        if (tabId === 'comandos') cargarComandos();
+        if (tabId === 'resumen') cargarStats();
+        if (tabId === 'admins') cargarAdmins();
+        if (tabId === 'configuracion') cargarConfiguracionAudio();
+    }
+
+    function mostrarToast(mensaje, tipo = 'info') {
+        const toast = document.getElementById('toast');
+        if (!toast) return;
+        toast.textContent = mensaje;
+        toast.className = `toast visible ${tipo}`;
+        setTimeout(() => toast.classList.remove('visible'), 3200);
+    }
+
+    async function fetchAPI(url, opciones = {}) {
+        opciones.headers = {
+            ...opciones.headers,
+            'Content-Type': 'application/json',
+            'x-admin-token': token
+        };
+        const res = await fetch(url, opciones);
+        if (res.status === 401) {
+            cerrarSesion();
+            throw new Error('Sesión expirada o token no autorizado.');
+        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error en la solicitud al servidor.');
+        return data;
+    }
+
+    function cargarDatosIniciales() {
+        cargarStats();
+        cargarFiltroComandos();
+        cargarGrabaciones();
+        cargarComandos();
+        cargarConfiguracionAudio();
+    }
+
+    // =======================================================================
+    // DASHBOARD & ESTADÍSTICAS
+    // =======================================================================
+    async function cargarStats() {
         try {
-            const res = await peticionAuth('/api/admin/stats');
-            const data = await res.json();
+            const data = await fetchAPI('/api/admin/stats');
+            datos.stats = data;
+            
+            const elTotal = document.getElementById('stat-total-grabaciones');
+            const elPart = document.getElementById('stat-participantes');
+            const elVal = document.getElementById('stat-validados');
+            const elRech = document.getElementById('stat-rechazados');
+            const elPend = document.getElementById('stat-pendientes');
+            const elDur = document.getElementById('stat-subtexto-duracion');
+            const elTasa = document.getElementById('stat-tasa-aprobacion');
+            const elProm = document.getElementById('stat-promedio-part');
 
-            if (statGrabaciones) statGrabaciones.textContent = data.totalGrabaciones || 0;
-            if (statParticipantes) statParticipantes.textContent = data.totalParticipantes || 0;
-            if (statComandos) statComandos.textContent = data.comandosActivos ? data.comandosActivos.length : 0;
+            if (elTotal) elTotal.textContent = (data.totalGrabaciones ?? 0).toLocaleString();
+            if (elPart) elPart.textContent = (data.totalParticipantes ?? 0).toLocaleString();
+            if (elVal) elVal.textContent = (data.validados ?? 0).toLocaleString();
+            if (elRech) elRech.textContent = (data.rechazados ?? 0).toLocaleString();
+            if (elPend) elPend.textContent = (data.sinRevisar ?? 0).toLocaleString();
 
-            if (graficoComandos && data.grabacionesPorComando) {
-                graficoComandos.innerHTML = '';
-                const comandosKeys = Object.keys(data.grabacionesPorComando);
-                const maxVal = Math.max(...Object.values(data.grabacionesPorComando), 40);
+            if (elDur) {
+                const segs = data.duracionTotalSegundos || 0;
+                const mins = (segs / 60).toFixed(1);
+                elDur.textContent = `${segs}s (${mins} min de audio)`;
+            }
 
-                comandosKeys.forEach(cmdNombre => {
-                    const conteo = data.grabacionesPorComando[cmdNombre] || 0;
-                    const barra = document.createElement('div');
-                    barra.className = 'barra-grafico';
-                    const ancho = (conteo / maxVal) * 100;
-                    barra.innerHTML = `
-                        <div class="barra-etiqueta">${cmdNombre}</div>
-                        <div class="barra-relleno" style="width: ${Math.max(5, ancho)}%">${conteo} audios</div>
+            if (elTasa) {
+                elTasa.textContent = `${data.tasaAprobacion ?? 0}% tasa de aprobación`;
+            }
+
+            if (elProm) {
+                elProm.textContent = `${data.promedioPorParticipante ?? 0} muestras / persona`;
+            }
+
+            renderizarDesglosesDashboard(data);
+        } catch (e) {
+            mostrarToast('Error al actualizar estadísticas: ' + e.message, 'error');
+        }
+    }
+
+    function renderizarDesglosesDashboard(data) {
+        // Desglose por Comando
+        const contCmds = document.getElementById('desglose-comandos');
+        const metaBadge = document.getElementById('meta-comando-badge');
+        const metaPorCmd = datos.configGrabacion.meta_por_comando || 40;
+        if (metaBadge) metaBadge.textContent = `Meta: ${metaPorCmd} / cmd`;
+
+        if (contCmds && data.grabacionesPorComando) {
+            const entriesCmd = Object.entries(data.grabacionesPorComando).sort((a, b) => b[1] - a[1]);
+            const maxVal = Math.max(...entriesCmd.map(e => e[1]), metaPorCmd, 1);
+
+            if (entriesCmd.length === 0) {
+                contCmds.innerHTML = '<div class="lote-preview-vacio">No hay datos de comandos aún.</div>';
+            } else {
+                contCmds.innerHTML = entriesCmd.map(([cmd, cuenta]) => {
+                    const pct = Math.min(100, Math.round((cuenta / maxVal) * 100));
+                    const validados = (data.validadosPorComando && data.validadosPorComando[cmd]) || 0;
+                    return `
+                        <div class="desglose-item" onclick="adminApp.filtrarPorComandoRapido('${cmd}')" title="Filtrar por ${cmd}">
+                            <div class="desglose-item-info">
+                                <span class="desglose-item-nombre">${cmd}</span>
+                                <span class="desglose-item-cuenta"><strong>${cuenta}</strong> grabaciones (${validados} ✓)</span>
+                            </div>
+                            <div class="barra-progreso-fondo">
+                                <div class="barra-progreso-relleno" style="width: ${pct}%;"></div>
+                            </div>
+                        </div>
                     `;
-                    graficoComandos.appendChild(barra);
-                });
+                }).join('');
             }
+        }
 
-            if (tablaParticipantes && data.grabacionesPorParticipante) {
-                tablaParticipantes.innerHTML = `
-                    <table class="tabla-datos">
-                        <thead>
-                            <tr><th>Alias Participante</th><th>Total Audios Grabados</th></tr>
-                        </thead>
-                        <tbody>
-                            ${Object.keys(data.grabacionesPorParticipante).map(aliasP => `
-                                <tr>
-                                    <td><strong>${aliasP}</strong></td>
-                                    <td>${data.grabacionesPorParticipante[aliasP]} audios</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                `;
+        // Desglose por Participante
+        const contParts = document.getElementById('desglose-participantes');
+        if (contParts && data.grabacionesPorParticipante) {
+            const entriesPart = Object.entries(data.grabacionesPorParticipante).sort((a, b) => b[1] - a[1]);
+            const maxValPart = Math.max(...entriesPart.map(e => e[1]), 1);
+
+            if (entriesPart.length === 0) {
+                contParts.innerHTML = '<div class="lote-preview-vacio">No hay participantes registrados aún.</div>';
+            } else {
+                contParts.innerHTML = entriesPart.map(([alias, cuenta]) => {
+                    const pct = Math.min(100, Math.round((cuenta / maxValPart) * 100));
+                    return `
+                        <div class="desglose-item" onclick="adminApp.filtrarPorAliasRapido('${alias}')" title="Filtrar por ${alias}">
+                            <div class="desglose-item-info">
+                                <span class="desglose-item-nombre">${alias}</span>
+                                <span class="desglose-item-cuenta">${cuenta} muestra(s)</span>
+                            </div>
+                            <div class="barra-progreso-fondo">
+                                <div class="barra-progreso-relleno" style="width: ${pct}%; background: var(--color-acento);"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
             }
-        } catch (err) {
-            console.error(err);
         }
     }
 
-    // =========================================================
-    // TAB: GRABACIONES
-    // =========================================================
-    async function poblarFiltrosComandos() {
-        try {
-            const res = await peticionAuth('/api/admin/comandos');
-            const data = await res.json();
-            if (filtroComando) {
-                filtroComando.innerHTML = '<option value="">Todos</option>';
-                data.comandos.forEach(c => {
-                    filtroComando.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
-                });
-            }
-        } catch (err) {}
+    function filtrarPorComandoRapido(cmd) {
+        cambiarTab('grabaciones');
+        const select = document.getElementById('filtro-comando');
+        if (select) select.value = cmd;
+        aplicarFiltrosGrabaciones();
     }
 
-    if (btnFiltrar) btnFiltrar.addEventListener('click', () => { currentPage = 1; cargarGrabaciones(); });
-    if (btnLimpiarFiltros) btnLimpiarFiltros.addEventListener('click', () => {
-        filtroAlias.value = '';
-        filtroComando.value = '';
-        currentPage = 1;
-        cargarGrabaciones();
-    });
+    function filtrarPorAliasRapido(alias) {
+        cambiarTab('grabaciones');
+        const input = document.getElementById('filtro-alias');
+        if (input) input.value = alias;
+        aplicarFiltrosGrabaciones();
+    }
 
-    // Paginacion
-    const btnPagAnterior = document.getElementById('btn-pag-anterior');
-    const btnPagSiguiente = document.getElementById('btn-pag-siguiente');
-    const infoPaginacion = document.getElementById('info-paginacion');
-
-    if (btnPagAnterior) btnPagAnterior.addEventListener('click', () => {
-        if (currentPage > 1) { currentPage--; cargarGrabaciones(); }
-    });
-    if (btnPagSiguiente) btnPagSiguiente.addEventListener('click', () => {
-        currentPage++;
-        cargarGrabaciones();
-    });
-
+    // =======================================================================
+    // GRABACIONES & FILTROS
+    // =======================================================================
     async function cargarGrabaciones() {
+        const tbody = document.getElementById('lista-grabaciones');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="7" class="spinner-inline"><div class="spinner spinner-pequeno"></div> Cargando grabaciones...</td></tr>';
+        
         try {
-            const params = new URLSearchParams({
-                pagina: currentPage,
-                limite: 20,
-                alias: filtroAlias ? filtroAlias.value.trim() : '',
-                comando: filtroComando ? filtroComando.value : ''
+            const query = new URLSearchParams({
+                pagina: filtros.pagina,
+                limite: filtros.limite,
+                ordenarPor: filtros.ordenarPor
             });
-            const res = await peticionAuth(`/api/admin/audios?${params}`);
-            const data = await res.json();
+            if (filtros.alias) query.append('alias', filtros.alias);
+            if (filtros.comando) query.append('comando', filtros.comando);
+            if (filtros.estado !== '') query.append('valido', filtros.estado);
 
-            if (tablaGrabacionesCuerpo) {
-                tablaGrabacionesCuerpo.innerHTML = '';
-                if (!data.grabaciones || data.grabaciones.length === 0) {
-                    tablaGrabacionesCuerpo.innerHTML = '<tr><td colspan="5" class="celda-cargando">Sin resultados</td></tr>';
-                    return;
+            const res = await fetchAPI(`/api/admin/audios?${query}`);
+            datos.grabaciones = res.grabaciones || [];
+            datos.totalGrabaciones = res.total || 0;
+            
+            const conteoEl = document.getElementById('conteo-resultados-grabaciones');
+            if (conteoEl) {
+                conteoEl.textContent = `Mostrando ${datos.grabaciones.length} de ${datos.totalGrabaciones} grabaciones`;
+            }
+
+            renderizarGrabaciones();
+            actualizarBarraLoteGrabaciones();
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="7" class="mensaje-error" style="padding: 20px; text-align: center;">Error al cargar grabaciones: ${e.message}</td></tr>`;
+        }
+    }
+
+    async function cargarFiltroComandos() {
+        try {
+            const data = await fetchAPI('/api/admin/comandos');
+            datos.comandos = data.comandos || [];
+            const select = document.getElementById('filtro-comando');
+            if (!select) return;
+            select.innerHTML = '<option value="">Todos los comandos</option>';
+            datos.comandos.forEach(c => {
+                select.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`;
+            });
+        } catch (e) {}
+    }
+
+    function renderizarGrabaciones() {
+        const tbody = document.getElementById('lista-grabaciones');
+        if (!tbody) return;
+
+        if (datos.grabaciones.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="lote-preview-vacio">No se encontraron grabaciones con los filtros seleccionados.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        datos.grabaciones.forEach(g => {
+            const tr = document.createElement('tr');
+            tr.id = `fila-${g.id}`;
+            
+            let estadoHtml = '';
+            let claseFila = '';
+            if (g.valido === true) {
+                estadoHtml = '<span class="badge badge-valido">✓ Válido</span>';
+                claseFila = 'fila-valida';
+            } else if (g.valido === false) {
+                estadoHtml = '<span class="badge badge-rechazado">✗ Rechazado</span>';
+                claseFila = 'fila-rechazada';
+            } else {
+                estadoHtml = '<span class="badge badge-pendiente">? Sin revisar</span>';
+            }
+            
+            if (claseFila) tr.className = claseFila;
+
+            const fecha = new Date(g.created_at).toLocaleString();
+            const checked = seleccionGrabaciones.has(g.id) ? 'checked' : '';
+
+            tr.innerHTML = `
+                <td style="text-align: center;">
+                    <input type="checkbox" class="campo-checkbox check-grabacion" value="${g.id}" ${checked} onchange="adminApp.toggleSeleccionGrabacion('${g.id}', event)">
+                </td>
+                <td style="font-weight: 600; color: var(--color-texto-1);">${g.alias}</td>
+                <td><code style="font-size: 0.9em; font-weight: 600;">${g.comando}</code></td>
+                <td style="font-family: var(--fuente-mono); font-size: 0.88em;">${g.duracion_s ? g.duracion_s.toFixed(2) + 's' : '-'}</td>
+                <td style="color: var(--color-texto-3); font-size: 0.82em; font-family: var(--fuente-mono);">${fecha}</td>
+                <td id="estado-${g.id}">${estadoHtml}</td>
+                <td class="celda-acciones">
+                    <button class="boton boton-pequeno boton-secundario" onclick="adminApp.toggleReproductor('${g.id}')" title="Escuchar y ver espectrograma STFT">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        Analizar
+                    </button>
+                    <button class="boton boton-pequeno ${g.valido === true ? 'boton-valido' : 'boton-fantasma'}" onclick="adminApp.validarGrabacion('${g.id}', true)" title="Marcar como Válido">✓</button>
+                    <button class="boton boton-pequeno ${g.valido === false ? 'boton-rechazar' : 'boton-fantasma'}" onclick="adminApp.validarGrabacion('${g.id}', false)" title="Marcar como Rechazado">✗</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        const checkTodas = document.getElementById('check-todas-grabaciones');
+        if (checkTodas) {
+            checkTodas.checked = datos.grabaciones.length > 0 && datos.grabaciones.every(g => seleccionGrabaciones.has(g.id));
+        }
+    }
+
+    function aplicarFiltrosGrabaciones() {
+        const inputAlias = document.getElementById('filtro-alias');
+        const selectCmd = document.getElementById('filtro-comando');
+        const selectEst = document.getElementById('filtro-estado');
+        const selectOrd = document.getElementById('filtro-orden');
+
+        filtros.alias = inputAlias ? inputAlias.value.trim() : '';
+        filtros.comando = selectCmd ? selectCmd.value : '';
+        filtros.estado = selectEst ? selectEst.value : '';
+        filtros.ordenarPor = selectOrd ? selectOrd.value : 'fecha_desc';
+        filtros.pagina = 0;
+        cargarGrabaciones();
+    }
+
+    function limpiarFiltrosGrabaciones() {
+        const inputAlias = document.getElementById('filtro-alias');
+        const selectCmd = document.getElementById('filtro-comando');
+        const selectEst = document.getElementById('filtro-estado');
+        const selectOrd = document.getElementById('filtro-orden');
+
+        if (inputAlias) inputAlias.value = '';
+        if (selectCmd) selectCmd.value = '';
+        if (selectEst) selectEst.value = '';
+        if (selectOrd) selectOrd.value = 'fecha_desc';
+
+        filtros.alias = '';
+        filtros.comando = '';
+        filtros.estado = '';
+        filtros.ordenarPor = 'fecha_desc';
+        filtros.pagina = 0;
+        cargarGrabaciones();
+    }
+
+    // =======================================================================
+    // REPRODUCTOR INLINE EXPANDIBLE & ESPECTROGRAMA STFT
+    // =======================================================================
+    function toggleReproductor(id) {
+        // Cerrar reproductor abierto anteriormente
+        if (reproductorActual && reproductorActual !== id) {
+            const trViejo = document.getElementById(`reproductor-tr-${reproductorActual}`);
+            if (trViejo) trViejo.remove();
+        }
+
+        const trFila = document.getElementById(`fila-${id}`);
+        const yaExiste = document.getElementById(`reproductor-tr-${id}`);
+
+        if (yaExiste) {
+            yaExiste.remove();
+            reproductorActual = null;
+            return;
+        }
+
+        const grab = datos.grabaciones.find(g => g.id === id);
+        if (!grab || !trFila) return;
+
+        let badgeClass = 'badge-pendiente';
+        let badgeText = '? Sin revisar';
+        if (grab.valido === true) {
+            badgeClass = 'badge-valido';
+            badgeText = '✓ Válido';
+        } else if (grab.valido === false) {
+            badgeClass = 'badge-rechazado';
+            badgeText = '✗ Rechazado';
+        }
+
+        const tr = document.createElement('tr');
+        tr.id = `reproductor-tr-${id}`;
+        tr.className = 'fila-reproductor';
+        
+        tr.innerHTML = `
+            <td colspan="7">
+                <div class="reproductor-inline-card">
+                    <div class="reproductor-header">
+                        <div class="reproductor-titulo">
+                            <span class="reproductor-badge-cmd">${grab.comando}</span>
+                            <span class="reproductor-alias">Grabado por <strong>${grab.alias}</strong></span>
+                            <span class="reproductor-fecha">${new Date(grab.created_at).toLocaleString()}</span>
+                        </div>
+                        <div class="reproductor-header-acciones">
+                            <span class="badge ${badgeClass}" id="inline-badge-${id}">${badgeText}</span>
+                            <button class="boton-icono" onclick="adminApp.toggleReproductor('${id}')" title="Cerrar reproductor">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Visualizador Espectrograma STFT -->
+                    <div class="espectrograma-admin-container">
+                        <div class="espectrograma-top-info">
+                            <span>Espectrograma STFT (Ventana Hann 512, Avance 128)</span>
+                            <span id="spec-status-${id}">Decodificando señal de audio...</span>
+                        </div>
+                        <div class="canvas-relative-wrapper">
+                            <canvas id="spec-canvas-${id}" class="espectrograma-canvas-admin" width="800" height="180"></canvas>
+                            <div id="spec-cursor-${id}" class="espectrograma-cursor"></div>
+                        </div>
+                        <div class="espectrograma-leyenda">
+                            <span>0 Hz (Graves)</span>
+                            <span>Análisis Espectral de Frecuencia vs Tiempo</span>
+                            <span id="spec-maxfreq-${id}">8000 Hz (Agudos)</span>
+                        </div>
+                    </div>
+
+                    <!-- Métricas Espectrales Calculadas -->
+                    <div id="metricas-${id}" class="descriptores-panel">
+                        <div class="descriptor-item">
+                            <span class="descriptor-nombre">Energía Baja (&lt;2kHz)</span>
+                            <span class="descriptor-valor" id="m-baja-${id}">--%</span>
+                        </div>
+                        <div class="descriptor-item">
+                            <span class="descriptor-nombre">Energía Alta (&gt;2kHz)</span>
+                            <span class="descriptor-valor" id="m-alta-${id}">--%</span>
+                        </div>
+                        <div class="descriptor-item">
+                            <span class="descriptor-nombre">HF / LF Ratio</span>
+                            <span class="descriptor-valor" id="m-hflf-${id}">--</span>
+                        </div>
+                        <div class="descriptor-item">
+                            <span class="descriptor-nombre">Cruces por Cero (ZCR)</span>
+                            <span class="descriptor-valor" id="m-zcr-${id}">--</span>
+                        </div>
+                        <div class="descriptor-item">
+                            <span class="descriptor-nombre">Centroide Espectral</span>
+                            <span class="descriptor-valor" id="m-centroide-${id}">-- Hz</span>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Reproducción y Acciones -->
+                    <div class="reproductor-footer">
+                        <audio id="audio-elem-${id}" controls class="reproductor-audio-custom" src="${grab.url_audio}" preload="auto"></audio>
+                        
+                        <div class="reproductor-estado-acciones">
+                            <button class="boton boton-valido ${grab.valido === true ? 'activo' : ''}" onclick="adminApp.validarGrabacion('${id}', true)">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                Validar
+                            </button>
+                            <button class="boton boton-rechazar ${grab.valido === false ? 'activo' : ''}" onclick="adminApp.validarGrabacion('${id}', false)">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                Rechazar
+                            </button>
+                            <button class="boton boton-secundario" onclick="adminApp.validarGrabacion('${id}', null)" title="Desmarcar / Dejar sin revisar">
+                                ? Sin Revisar
+                            </button>
+                            <a class="boton boton-secundario" href="${grab.url_audio}" download="${grab.alias}_${grab.comando}.wav" title="Descargar archivo WAV">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+                                WAV
+                            </a>
+                            <button class="boton boton-peligro boton-icono-solo" onclick="adminApp.eliminarGrabacion('${id}')" title="Eliminar grabación">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        `;
+        
+        trFila.insertAdjacentElement('afterend', tr);
+        reproductorActual = id;
+
+        // Renderizado del espectrograma y cálculo de descriptores espectrales
+        renderizarEspectrogramaGrabacion(id, grab.url_audio);
+    }
+
+    async function renderizarEspectrogramaGrabacion(id, url) {
+        try {
+            const canvas = document.getElementById(`spec-canvas-${id}`);
+            const statusSpan = document.getElementById(`spec-status-${id}`);
+            const maxFreqSpan = document.getElementById(`spec-maxfreq-${id}`);
+            const cursor = document.getElementById(`spec-cursor-${id}`);
+            const audioElement = document.getElementById(`audio-elem-${id}`);
+            if (!canvas) return;
+
+            // Decodificación de audio
+            let arrayBuffer;
+            if (url.startsWith('data:audio')) {
+                const base64 = url.split(',')[1];
+                const binaryString = atob(base64);
+                const len = binaryString.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
                 }
-                data.grabaciones.forEach(g => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${g.alias}</td>
-                        <td>${g.comando}</td>
-                        <td>${g.duracion_s} s</td>
-                        <td>${new Date(g.created_at).toLocaleString()}</td>
-                        <td>
-                            <button class="boton boton-secundario boton-pequeno" onclick="abrirReproductor('${g.url_audio}', '${g.alias}', '${g.comando}')">Escuchar</button>
-                            <button class="boton boton-peligro boton-pequeno" onclick="eliminarGrabacion('${g.id}')">Eliminar</button>
-                        </td>
-                    `;
-                    tablaGrabacionesCuerpo.appendChild(tr);
+                arrayBuffer = bytes.buffer;
+            } else {
+                const response = await fetch(url);
+                arrayBuffer = await response.arrayBuffer();
+            }
+
+            if (!audioContextGlobal) {
+                audioContextGlobal = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const audioBuffer = await audioContextGlobal.decodeAudioData(arrayBuffer.slice(0));
+            const pcmData = audioBuffer.getChannelData(0);
+            const sampleRate = audioBuffer.sampleRate || 16000;
+
+            if (maxFreqSpan) {
+                maxFreqSpan.textContent = `${Math.round(sampleRate / 2)} Hz (Agudos)`;
+            }
+
+            // STFT via DSP
+            const stftFunc = (window.DSP && window.DSP.espectrogramaSTFT) || espectrogramaSTFT;
+            const descFunc = (window.DSP && window.DSP.descriptoresEspectrales) || descriptoresEspectrales;
+            const drawFunc = (window.Espectrograma && window.Espectrograma.dibujarEspectrograma) || window.dibujarEspectrograma || dibujarEspectrograma;
+
+            const stft = stftFunc(pcmData, 512, 128, sampleRate);
+            drawFunc(canvas, stft, { dbMin: -70, dbMax: 0, mostrarEjes: true });
+
+            // Descriptores espectrales
+            if (descFunc) {
+                const desc = descFunc(pcmData, sampleRate);
+                if (desc) {
+                    const mBaja = document.getElementById(`m-baja-${id}`);
+                    const mAlta = document.getElementById(`m-alta-${id}`);
+                    const mHflf = document.getElementById(`m-hflf-${id}`);
+                    const mZcr = document.getElementById(`m-zcr-${id}`);
+                    const mCent = document.getElementById(`m-centroide-${id}`);
+
+                    if (mBaja) mBaja.textContent = (desc.energiaBaja * 100).toFixed(1) + '%';
+                    if (mAlta) mAlta.textContent = (desc.energiaAlta * 100).toFixed(1) + '%';
+                    if (mHflf) mHflf.textContent = desc.hflfRatio.toFixed(3);
+                    if (mZcr) mZcr.textContent = desc.zcr.toFixed(4);
+                    if (mCent) mCent.textContent = Math.round(desc.centroideHz) + ' Hz';
+                }
+            }
+
+            if (statusSpan) {
+                const dur = (pcmData.length / sampleRate).toFixed(2);
+                statusSpan.textContent = `${pcmData.length.toLocaleString()} muestras (${dur}s @ ${sampleRate}Hz)`;
+            }
+
+            // Cursor interactivo sincronizado con el tiempo de reproducción
+            if (audioElement && cursor) {
+                const actualizarCursor = () => {
+                    if (audioElement.duration > 0) {
+                        const margenIzq = 56;
+                        const margenDer = 12;
+                        const anchoTotal = canvas.clientWidth || 800;
+                        const anchoPlot = anchoTotal - margenIzq - margenDer;
+                        const pct = audioElement.currentTime / audioElement.duration;
+                        const posX = margenIzq + (pct * anchoPlot);
+                        cursor.style.left = `${posX}px`;
+                        cursor.style.display = 'block';
+                    }
+                };
+                audioElement.addEventListener('timeupdate', actualizarCursor);
+                audioElement.addEventListener('ended', () => {
+                    cursor.style.display = 'none';
+                });
+                audioElement.addEventListener('pause', () => {
+                    if (audioElement.currentTime === 0 || audioElement.ended) {
+                        cursor.style.display = 'none';
+                    }
                 });
             }
-
-            if (infoPaginacion) infoPaginacion.textContent = `Página ${currentPage}`;
-            if (btnPagAnterior) btnPagAnterior.disabled = currentPage <= 1;
-            if (btnPagSiguiente) btnPagSiguiente.disabled = !data.grabaciones || data.grabaciones.length < 20;
-
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.warn('Espectrograma STFT cargado en modo estándar:', err);
+            const statusSpan = document.getElementById(`spec-status-${id}`);
+            if (statusSpan) statusSpan.textContent = 'Audio listo para reproducción';
+        }
     }
 
-    window.eliminarGrabacion = async (id) => {
-        if (!confirm('¿Eliminar esta grabacion?')) return;
+    // =======================================================================
+    // VALIDACIÓN & ELIMINACIÓN INDIVIDUAL
+    // =======================================================================
+    async function validarGrabacion(id, validoStatus) {
         try {
-            const res = await peticionAuth(`/api/admin/grabaciones/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                mostrarToast('Grabacion eliminada', 'exito');
-                cargarGrabaciones();
+            await fetchAPI(`/api/admin/grabaciones/${id}/validar`, {
+                method: 'PUT',
+                body: JSON.stringify({ valido: validoStatus })
+            });
+
+            const g = datos.grabaciones.find(x => x.id === id);
+            if (g) g.valido = validoStatus;
+
+            // Actualizar fila en la tabla
+            const tr = document.getElementById(`fila-${id}`);
+            const celdaEstado = document.getElementById(`estado-${id}`);
+            if (tr) {
+                tr.classList.remove('fila-valida', 'fila-rechazada');
+                if (validoStatus === true) tr.classList.add('fila-valida');
+                if (validoStatus === false) tr.classList.add('fila-rechazada');
             }
-        } catch (err) {
-            mostrarToast('Error al eliminar', 'error');
+            if (celdaEstado) {
+                if (validoStatus === true) celdaEstado.innerHTML = '<span class="badge badge-valido">✓ Válido</span>';
+                else if (validoStatus === false) celdaEstado.innerHTML = '<span class="badge badge-rechazado">✗ Rechazado</span>';
+                else celdaEstado.innerHTML = '<span class="badge badge-pendiente">? Sin revisar</span>';
+            }
+
+            // Actualizar badge del reproductor si está abierto
+            const badgeInline = document.getElementById(`inline-badge-${id}`);
+            if (badgeInline) {
+                if (validoStatus === true) {
+                    badgeInline.className = 'badge badge-valido';
+                    badgeInline.textContent = '✓ Válido';
+                } else if (validoStatus === false) {
+                    badgeInline.className = 'badge badge-rechazado';
+                    badgeInline.textContent = '✗ Rechazado';
+                } else {
+                    badgeInline.className = 'badge badge-pendiente';
+                    badgeInline.textContent = '? Sin revisar';
+                }
+            }
+
+            cargarStats();
+            const estadoTexto = validoStatus === true ? 'marcada como válida' : (validoStatus === false ? 'marcada como rechazada' : 'puesta sin revisar');
+            mostrarToast(`Grabación ${estadoTexto}`, 'exito');
+        } catch (e) {
+            mostrarToast('Error al actualizar estado: ' + e.message, 'error');
         }
-    };
-
-    // =========================================================
-    // MODAL: REPRODUCTOR DE AUDIO
-    // =========================================================
-    window.abrirReproductor = async (url, alias, comando) => {
-        modalReproductor.classList.remove('oculto');
-        audioReproductor.src = url;
-        document.getElementById('modal-titulo').textContent = `Grabacion de ${alias}`;
-        document.getElementById('modal-subtitulo').textContent = `Comando: ${comando}`;
-
-        try {
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const res = await fetch(url);
-            const arrayBuffer = await res.arrayBuffer();
-            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-            const audioData = audioBuffer.getChannelData(0);
-
-            const espectrograma = DSP.espectrogramaSTFT(audioData, 512, 256);
-            Espectrograma.dibujarEspectrograma(canvasModal, espectrograma, audioBuffer.sampleRate);
-
-            const descriptores = DSP.descriptoresEspectrales(espectrograma, audioBuffer.sampleRate);
-            document.getElementById('modal-desc-hflf').textContent = descriptores.hflfRatio.toFixed(3);
-            document.getElementById('modal-desc-alta').textContent = descriptores.energiaAlta.toFixed(3);
-            document.getElementById('modal-desc-baja').textContent = descriptores.energiaBaja.toFixed(3);
-        } catch (err) {
-            console.error('Error al procesar audio en modal', err);
-        }
-    };
-
-    function cerrarReproductor() {
-        modalReproductor.classList.add('oculto');
-        audioReproductor.pause();
-        audioReproductor.src = '';
     }
 
-    if (btnCerrarReproductor) btnCerrarReproductor.addEventListener('click', cerrarReproductor);
-    window.addEventListener('click', (e) => {
-        if (e.target === modalReproductor) cerrarReproductor();
-    });
-
-    // =========================================================
-    // TAB: COMANDOS
-    // =========================================================
-    async function cargarComandos() {
+    async function eliminarGrabacion(id) {
+        if (!confirm('¿Eliminar esta grabación de audio de forma permanente?')) return;
         try {
-            const res = await peticionAuth('/api/admin/comandos');
-            const data = await res.json();
-            listaComandosAdmin.innerHTML = '';
-            data.comandos.forEach(c => {
-                const div = document.createElement('div');
-                div.className = 'tarjeta-comando-admin';
-                div.innerHTML = `
+            await fetchAPI(`/api/admin/grabaciones/${id}`, { method: 'DELETE' });
+            mostrarToast('Grabación eliminada correctamente', 'exito');
+            
+            if (reproductorActual === id) {
+                const trRep = document.getElementById(`reproductor-tr-${id}`);
+                if (trRep) trRep.remove();
+                reproductorActual = null;
+            }
+
+            seleccionGrabaciones.delete(id);
+            cargarGrabaciones();
+            cargarStats();
+        } catch (e) {
+            mostrarToast('Error al eliminar grabación: ' + e.message, 'error');
+        }
+    }
+
+    // =======================================================================
+    // SELECCIÓN Y ACCIONES EN LOTE (GRABACIONES)
+    // =======================================================================
+    function toggleSeleccionGrabacion(id, event) {
+        if (event.target.checked) seleccionGrabaciones.add(id);
+        else seleccionGrabaciones.delete(id);
+        actualizarBarraLoteGrabaciones();
+    }
+
+    function toggleSeleccionTodasGrabaciones(event) {
+        const checkboxes = document.querySelectorAll('.check-grabacion');
+        if (event.target.checked) {
+            checkboxes.forEach(cb => {
+                cb.checked = true;
+                seleccionGrabaciones.add(cb.value);
+            });
+        } else {
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+                seleccionGrabaciones.delete(cb.value);
+            });
+        }
+        actualizarBarraLoteGrabaciones();
+    }
+
+    function actualizarBarraLoteGrabaciones() {
+        const barra = document.getElementById('barra-lote-grabaciones');
+        const texto = document.getElementById('texto-lote-grabaciones');
+        const checkTodas = document.getElementById('check-todas-grabaciones');
+        if (!barra || !texto) return;
+
+        if (seleccionGrabaciones.size > 0) {
+            texto.textContent = `${seleccionGrabaciones.size} grabación(es) seleccionada(s)`;
+            barra.classList.add('activa');
+        } else {
+            barra.classList.remove('activa');
+        }
+
+        if (checkTodas) {
+            checkTodas.checked = datos.grabaciones.length > 0 && datos.grabaciones.every(g => seleccionGrabaciones.has(g.id));
+        }
+    }
+
+    async function procesarLoteGrabaciones(accion) {
+        if (seleccionGrabaciones.size === 0) return;
+        const ids = Array.from(seleccionGrabaciones);
+
+        try {
+            if (accion === 'eliminar') {
+                if (!confirm(`¿Eliminar definitivamente las ${ids.length} grabaciones seleccionadas?`)) return;
+                const res = await fetchAPI('/api/admin/grabaciones', {
+                    method: 'DELETE',
+                    body: JSON.stringify({ ids })
+                });
+                mostrarToast(`${res.eliminados || ids.length} grabaciones eliminadas`, 'exito');
+                seleccionGrabaciones.clear();
+                if (reproductorActual && ids.includes(reproductorActual)) {
+                    reproductorActual = null;
+                }
+                cargarGrabaciones();
+                cargarStats();
+            } else if (accion === 'validar' || accion === 'rechazar' || accion === 'reset') {
+                let valido = null;
+                if (accion === 'validar') valido = true;
+                if (accion === 'rechazar') valido = false;
+
+                const res = await fetchAPI('/api/admin/grabaciones/lote-validar', {
+                    method: 'PUT',
+                    body: JSON.stringify({ ids, valido })
+                });
+                const textoAccion = valido === true ? 'válidas' : (valido === false ? 'rechazadas' : 'sin revisar');
+                mostrarToast(`${res.actualizados || ids.length} grabaciones marcadas como ${textoAccion}`, 'exito');
+                seleccionGrabaciones.clear();
+                cargarGrabaciones();
+                cargarStats();
+            }
+        } catch (e) {
+            mostrarToast('Error al procesar lote: ' + e.message, 'error');
+        }
+    }
+
+    function descargarZipSeleccionados() {
+        if (seleccionGrabaciones.size === 0) return;
+        const ids = Array.from(seleccionGrabaciones).join(',');
+        window.open(`/api/admin/descargar-zip?ids=${encodeURIComponent(ids)}&token=${encodeURIComponent(token)}`, '_blank');
+    }
+
+    // =======================================================================
+    // GESTIÓN DE COMANDOS (INDIVIDUAL Y EN LOTE)
+    // =======================================================================
+    async function cargarComandos() {
+        const contenedor = document.getElementById('lista-comandos');
+        if (!contenedor) return;
+        contenedor.innerHTML = '<div class="spinner-inline"><div class="spinner spinner-pequeno"></div> Cargando comandos...</div>';
+        
+        try {
+            const res = await fetchAPI('/api/admin/comandos');
+            datos.comandos = res.comandos || [];
+            renderizarComandos();
+            cargarFiltroComandos();
+        } catch (e) {
+            contenedor.innerHTML = `<div class="mensaje-error" style="padding: 20px;">Error al cargar comandos: ${e.message}</div>`;
+        }
+    }
+
+    function renderizarComandos() {
+        const contenedor = document.getElementById('lista-comandos');
+        if (!contenedor) return;
+        contenedor.innerHTML = '';
+        
+        if (datos.comandos.length === 0) {
+            contenedor.innerHTML = '<div class="lote-preview-vacio">No hay comandos registrados. Crea uno nuevo o importa en lote.</div>';
+            return;
+        }
+
+        datos.comandos.forEach(c => {
+            const div = document.createElement('div');
+            div.className = 'tarjeta-comando-admin';
+            const checked = seleccionComandos.has(c.id) ? 'checked' : '';
+
+            div.innerHTML = `
+                <div class="tarjeta-cmd-header">
                     <div class="tarjeta-cmd-info">
                         <h4>${c.nombre}</h4>
-                        <p>${c.descripcion || ''}</p>
-                        <span class="estado-badge ${c.activo ? 'activo' : 'inactivo'}">${c.activo ? 'Activo' : 'Inactivo'}</span>
+                        <p>${c.descripcion || 'Sin instrucción específica'}</p>
+                        <div class="tarjeta-cmd-badges">
+                            <span class="badge ${c.activo ? 'badge-valido' : 'badge-rechazado'}">${c.activo ? 'Activo' : 'Inactivo'}</span>
+                            <span class="badge badge-primario">Orden: ${c.orden}</span>
+                            <span class="badge badge-pendiente">${c.totalMuestras || 0} audios (${c.validadas || 0} ✓)</span>
+                        </div>
                     </div>
-                    <div class="tarjeta-cmd-acciones">
-                        <button class="boton boton-secundario boton-pequeno" onclick="editarComando('${c.id}', '${encodeURIComponent(c.nombre)}', '${encodeURIComponent(c.descripcion || '')}', ${c.orden || 0}, ${c.activo})">Editar</button>
-                        <button class="boton boton-peligro boton-pequeno" onclick="eliminarComando('${c.id}')">Eliminar</button>
+                    <input type="checkbox" class="campo-checkbox check-comando" value="${c.id}" ${checked} onchange="adminApp.toggleSeleccionComando('${c.id}', event)">
+                </div>
+                <div class="tarjeta-cmd-acciones">
+                    <button class="boton boton-pequeno boton-fantasma" onclick="adminApp.toggleActivoComando('${c.id}')" title="Activar/Desactivar">
+                        ${c.activo ? 'Desactivar' : 'Activar'}
+                    </button>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="boton boton-pequeno boton-secundario" onclick="adminApp.editarComando('${c.id}')">Editar</button>
+                        <button class="boton boton-pequeno boton-peligro" onclick="adminApp.eliminarComando('${c.id}')">Eliminar</button>
+                    </div>
+                </div>
+            `;
+            contenedor.appendChild(div);
+        });
+
+        actualizarBarraLoteComandos();
+    }
+
+    async function toggleActivoComando(id) {
+        try {
+            await fetchAPI(`/api/admin/comandos/${id}/toggle`, { method: 'PUT' });
+            cargarComandos();
+            cargarStats();
+            mostrarToast('Estado del comando actualizado', 'exito');
+        } catch (e) {
+            mostrarToast('Error: ' + e.message, 'error');
+        }
+    }
+
+    function toggleSeleccionComando(id, event) {
+        if (event.target.checked) seleccionComandos.add(id);
+        else seleccionComandos.delete(id);
+        actualizarBarraLoteComandos();
+    }
+
+    function toggleSeleccionTodosComandos(event) {
+        const checkboxes = document.querySelectorAll('.check-comando');
+        if (event.target.checked) {
+            checkboxes.forEach(cb => {
+                cb.checked = true;
+                seleccionComandos.add(cb.value);
+            });
+        } else {
+            checkboxes.forEach(cb => {
+                cb.checked = false;
+                seleccionComandos.delete(cb.value);
+            });
+        }
+        actualizarBarraLoteComandos();
+    }
+
+    function actualizarBarraLoteComandos() {
+        const barra = document.getElementById('acciones-lote-comandos');
+        const texto = document.getElementById('texto-seleccion-comandos');
+        const checkTodos = document.getElementById('check-todos-comandos');
+        if (!barra || !texto) return;
+
+        if (seleccionComandos.size > 0) {
+            texto.textContent = `${seleccionComandos.size} comando(s) seleccionado(s)`;
+            barra.style.display = 'flex';
+        } else {
+            barra.style.display = 'none';
+        }
+
+        if (checkTodos) {
+            checkTodos.checked = datos.comandos.length > 0 && datos.comandos.every(c => seleccionComandos.has(c.id));
+        }
+    }
+
+    async function eliminarComandosSeleccionados() {
+        if (seleccionComandos.size === 0) return;
+        const ids = Array.from(seleccionComandos);
+        if (!confirm(`¿Eliminar los ${ids.length} comandos seleccionados?`)) return;
+        
+        try {
+            const res = await fetchAPI('/api/admin/comandos', {
+                method: 'DELETE',
+                body: JSON.stringify({ ids })
+            });
+            mostrarToast(`${res.eliminados || ids.length} comandos eliminados`, 'exito');
+            seleccionComandos.clear();
+            cargarComandos();
+            cargarStats();
+        } catch (e) {
+            mostrarToast('Error al eliminar comandos: ' + e.message, 'error');
+        }
+    }
+
+    // Modal de comando individual
+    function abrirModalComando() {
+        const form = document.getElementById('form-comando');
+        if (form) form.reset();
+        document.getElementById('cmd-id').value = '';
+        document.getElementById('cmd-orden').value = datos.comandos.length + 1;
+        document.getElementById('modal-comando-titulo').textContent = 'Nuevo Comando';
+        document.getElementById('modal-comando').classList.remove('oculto');
+    }
+
+    function editarComando(id) {
+        const cmd = datos.comandos.find(c => c.id === id);
+        if (!cmd) return;
+        
+        document.getElementById('cmd-id').value = cmd.id;
+        document.getElementById('cmd-nombre').value = cmd.nombre;
+        document.getElementById('cmd-desc').value = cmd.descripcion || '';
+        document.getElementById('cmd-orden').value = cmd.orden || 1;
+        document.getElementById('cmd-activo').checked = cmd.activo !== false;
+        
+        document.getElementById('modal-comando-titulo').textContent = 'Editar Comando';
+        document.getElementById('modal-comando').classList.remove('oculto');
+    }
+
+    async function guardarComando(e) {
+        e.preventDefault();
+        const id = document.getElementById('cmd-id').value;
+        const nombre = document.getElementById('cmd-nombre').value.trim();
+        const descripcion = document.getElementById('cmd-desc').value.trim();
+        const orden = parseInt(document.getElementById('cmd-orden').value) || 1;
+        const activo = document.getElementById('cmd-activo').checked;
+
+        if (!nombre) return mostrarToast('El nombre es obligatorio', 'error');
+
+        const url = id ? `/api/admin/comandos/${id}` : '/api/admin/comandos';
+        const method = id ? 'PUT' : 'POST';
+
+        try {
+            await fetchAPI(url, {
+                method,
+                body: JSON.stringify({ nombre, descripcion, orden, activo })
+            });
+            mostrarToast(`Comando "${nombre}" ${id ? 'actualizado' : 'creado'} con éxito`, 'exito');
+            cerrarModal('modal-comando');
+            cargarComandos();
+            cargarStats();
+        } catch (e) {
+            mostrarToast('Error al guardar: ' + e.message, 'error');
+        }
+    }
+
+    async function eliminarComando(id) {
+        const cmd = datos.comandos.find(c => c.id === id);
+        const nombre = cmd ? cmd.nombre : 'este comando';
+        if (!confirm(`¿Seguro que deseas eliminar el comando "${nombre}"?`)) return;
+        
+        try {
+            await fetchAPI(`/api/admin/comandos/${id}`, { method: 'DELETE' });
+            mostrarToast('Comando eliminado', 'exito');
+            seleccionComandos.delete(id);
+            cargarComandos();
+            cargarStats();
+        } catch (e) {
+            mostrarToast('Error al eliminar: ' + e.message, 'error');
+        }
+    }
+
+    // Modal Crear Comandos en Lote
+    function abrirModalLote() {
+        const textarea = document.getElementById('lote-texto');
+        if (textarea) textarea.value = '';
+        actualizarPreviewLote();
+        document.getElementById('modal-lote').classList.remove('oculto');
+    }
+
+    function getComandosLoteParseados() {
+        const textarea = document.getElementById('lote-texto');
+        if (!textarea) return [];
+        const rawLines = textarea.value.split(/[\n,]+/);
+        const nombresExistentes = new Set(datos.comandos.map(c => c.nombre.toLowerCase()));
+
+        // Sanitización y deduplicación interna
+        const unicosMap = new Map();
+        rawLines.forEach(line => {
+            const trimmed = line.trim();
+            if (trimmed.length > 0) {
+                const lower = trimmed.toLowerCase();
+                if (!unicosMap.has(lower)) {
+                    unicosMap.set(lower, trimmed);
+                }
+            }
+        });
+
+        const autodesc = document.getElementById('lote-auto-desc')?.checked !== false;
+        let ordenBase = datos.comandos.length;
+
+        return Array.from(unicosMap.values()).map((nombre, i) => {
+            const yaExiste = nombresExistentes.has(nombre.toLowerCase());
+            return {
+                nombre,
+                descripcion: autodesc ? `Pronuncia la palabra "${nombre}" con voz clara y tono natural.` : '',
+                activo: true,
+                orden: ordenBase + i + 1,
+                yaExiste
+            };
+        });
+    }
+
+    function actualizarPreviewLote() {
+        const comandos = getComandosLoteParseados();
+        const lista = document.getElementById('lote-preview-lista');
+        const countSpan = document.getElementById('lote-preview-count');
+        if (!lista) return;
+
+        if (countSpan) countSpan.textContent = comandos.length;
+        
+        if (comandos.length === 0) {
+            lista.innerHTML = '<div class="lote-preview-vacio">Escribe palabras para ver la vista previa en tiempo real.</div>';
+            return;
+        }
+
+        lista.innerHTML = comandos.map(c => `
+            <div class="lote-preview-item">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 700; color: var(--color-texto-1); font-size: 0.92rem;">${c.nombre}</span>
+                    ${c.yaExiste ? '<span class="badge badge-rechazado" style="font-size: 0.7rem;">Ya existe</span>' : '<span class="badge badge-valido" style="font-size: 0.7rem;">Nuevo</span>'}
+                </div>
+                <span style="color: var(--color-texto-3); font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${c.descripcion}</span>
+            </div>
+        `).join('');
+    }
+
+    async function procesarLoteComandos() {
+        const parseados = getComandosLoteParseados();
+        const comandos = parseados.map(c => ({
+            nombre: c.nombre,
+            descripcion: c.descripcion,
+            activo: c.activo,
+            orden: c.orden
+        }));
+
+        if (comandos.length === 0) return mostrarToast('Escribe al menos un comando válido', 'error');
+
+        const btn = document.getElementById('btn-procesar-lote');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Creando...';
+        }
+
+        try {
+            const res = await fetchAPI('/api/admin/comandos/lote', {
+                method: 'POST',
+                body: JSON.stringify({ comandos })
+            });
+            mostrarToast(`${res.total || comandos.length} comandos registrados con éxito`, 'exito');
+            cerrarModal('modal-lote');
+            cargarComandos();
+            cargarStats();
+        } catch (e) {
+            mostrarToast('Error al crear comandos en lote: ' + e.message, 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Crear Comandos';
+            }
+        }
+    }
+
+    // =======================================================================
+    // MULTI-ADMIN TAB
+    // =======================================================================
+    async function cargarAdmins() {
+        const contenedor = document.getElementById('lista-admins');
+        if (!contenedor) return;
+        contenedor.innerHTML = '<div class="spinner-inline"><div class="spinner spinner-pequeno"></div> Cargando administradores...</div>';
+
+        try {
+            const data = await fetchAPI('/api/admin/admins');
+            datos.admins = data.admins || [];
+            
+            contenedor.innerHTML = datos.admins.map(adm => {
+                const isSuper = adm.esSuperAdmin;
+                return `
+                    <div class="admin-token-item ${isSuper ? 'super-admin' : ''}">
+                        <div class="admin-token-icono">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                        </div>
+                        <div class="admin-token-info">
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <span style="font-weight: 700; color: var(--color-texto-1); font-size: 0.95rem;">Token #${adm.id}</span>
+                                <span class="badge ${isSuper ? 'badge-super' : 'badge-primario'}">${adm.rol}</span>
+                                ${adm.esActual ? '<span class="badge badge-valido" style="font-size: 0.7rem;">Sesión Actual</span>' : ''}
+                            </div>
+                            <span class="admin-token-valor">${adm.mascara}</span>
+                        </div>
                     </div>
                 `;
-                listaComandosAdmin.appendChild(div);
-            });
-        } catch (err) { console.error(err); }
-    }
-
-    window.eliminarComando = async (id) => {
-        if (!confirm('¿Eliminar este comando?')) return;
-        try {
-            const res = await peticionAuth(`/api/admin/comandos/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                mostrarToast('Comando eliminado', 'exito');
-                cargarComandos();
-                poblarFiltrosComandos();
-            }
-        } catch (err) {
-            mostrarToast('Error al eliminar', 'error');
-        }
-    };
-
-    // =========================================================
-    // MODAL: CREAR / EDITAR COMANDO
-    // =========================================================
-    function abrirModalComando() {
-        modalComando.classList.remove('oculto');
-    }
-
-    function cerrarModalComando() {
-        modalComando.classList.add('oculto');
-        formComando.reset();
-        document.getElementById('cmd-id').value = '';
-        document.getElementById('modal-comando-titulo').textContent = 'Nuevo comando';
-        const errEl = document.getElementById('modal-comando-error');
-        if (errEl) errEl.classList.add('oculto');
-    }
-
-    if (btnNuevoComando) {
-        btnNuevoComando.addEventListener('click', () => {
-            document.getElementById('cmd-id').value = '';
-            document.getElementById('cmd-nombre').value = '';
-            document.getElementById('cmd-descripcion').value = '';
-            document.getElementById('cmd-orden').value = '0';
-            document.getElementById('cmd-activo').checked = true;
-            document.getElementById('modal-comando-titulo').textContent = 'Nuevo comando';
-            abrirModalComando();
-        });
-    }
-
-    if (btnCerrarModalComando) btnCerrarModalComando.addEventListener('click', cerrarModalComando);
-    if (btnCancelarComando) btnCancelarComando.addEventListener('click', cerrarModalComando);
-    window.addEventListener('click', (e) => {
-        if (e.target === modalComando) cerrarModalComando();
-    });
-
-    window.editarComando = (id, nombreEnc, descEnc, orden, activo) => {
-        document.getElementById('cmd-id').value = id;
-        document.getElementById('cmd-nombre').value = decodeURIComponent(nombreEnc);
-        document.getElementById('cmd-descripcion').value = decodeURIComponent(descEnc);
-        document.getElementById('cmd-orden').value = orden;
-        document.getElementById('cmd-activo').checked = activo === true || activo === 'true';
-        document.getElementById('modal-comando-titulo').textContent = 'Editar comando';
-        abrirModalComando();
-    };
-
-    if (formComando) {
-        formComando.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const errEl = document.getElementById('modal-comando-error');
-            if (errEl) errEl.classList.add('oculto');
-
-            const id = document.getElementById('cmd-id').value.trim();
-            const nombre = document.getElementById('cmd-nombre').value.trim();
-            const descripcion = document.getElementById('cmd-descripcion').value.trim();
-            const orden = parseInt(document.getElementById('cmd-orden').value) || 0;
-            const activo = document.getElementById('cmd-activo').checked;
-
-            if (!nombre) {
-                if (errEl) { errEl.textContent = 'El nombre es obligatorio.'; errEl.classList.remove('oculto'); }
-                return;
-            }
-
-            const esEdicion = id !== '';
-            const url = esEdicion ? `/api/admin/comandos/${id}` : '/api/admin/comandos';
-            const method = esEdicion ? 'PUT' : 'POST';
-
-            try {
-                const res = await peticionAuth(url, {
-                    method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nombre, descripcion, orden, activo })
-                });
-                const data = await res.json();
-
-                if (res.ok && (data.exito || data.comando)) {
-                    mostrarToast(esEdicion ? 'Comando actualizado' : 'Comando creado', 'exito');
-                    cerrarModalComando();
-                    cargarComandos();
-                    poblarFiltrosComandos();
-                } else {
-                    if (errEl) {
-                        errEl.textContent = data.error || 'Error al guardar';
-                        errEl.classList.remove('oculto');
-                    }
-                }
-            } catch (err) {
-                mostrarToast('Error de conexion', 'error');
-            }
-        });
-    }
-
-    // =========================================================
-    // MODAL: CREAR COMANDOS EN LOTE
-    // =========================================================
-    const modalLote = document.getElementById('modal-lote');
-    const btnLoteComandos = document.getElementById('btn-lote-comandos');
-    const btnLoteCerrar = document.getElementById('modal-lote-cerrar');
-    const btnLoteCancelar = document.getElementById('btn-lote-cancelar');
-    const btnLoteCrear = document.getElementById('btn-lote-crear');
-    const loteTextarea = document.getElementById('lote-textarea');
-    const loteContador = document.getElementById('lote-contador');
-    const loteProgreso = document.getElementById('lote-progreso');
-    const loteBarraFill = document.getElementById('lote-barra-fill');
-    const loteProgresoTexto = document.getElementById('lote-progreso-texto');
-    const loteError = document.getElementById('lote-error');
-
-    function parsearLineasLote(texto) {
-        return texto
-            .split('\n')
-            .map(l => l.trim())
-            .filter(l => l.length > 0)
-            .map((l, i) => {
-                const partes = l.split('|');
-                return {
-                    nombre: partes[0].trim(),
-                    descripcion: partes[1] ? partes[1].trim() : '',
-                    orden: i,
-                    activo: true
-                };
-            })
-            .filter(c => c.nombre.length > 0);
-    }
-
-    function actualizarContadorLote() {
-        const cmds = parsearLineasLote(loteTextarea.value);
-        const n = cmds.length;
-        loteContador.textContent = n === 1 ? '1 comando' : `${n} comandos`;
-        loteContador.className = 'lote-contador' + (n > 0 ? ' lote-contador-activo' : '');
-    }
-
-    function abrirModalLote() {
-        loteTextarea.value = '';
-        loteContador.textContent = '0 comandos';
-        loteContador.className = 'lote-contador';
-        loteProgreso.classList.add('oculto');
-        loteError.classList.add('oculto');
-        btnLoteCrear.disabled = false;
-        modalLote.classList.remove('oculto');
-        loteTextarea.focus();
-    }
-
-    function cerrarModalLote() {
-        modalLote.classList.add('oculto');
-    }
-
-    if (loteTextarea) loteTextarea.addEventListener('input', actualizarContadorLote);
-    if (btnLoteComandos) btnLoteComandos.addEventListener('click', abrirModalLote);
-    if (btnLoteCerrar) btnLoteCerrar.addEventListener('click', cerrarModalLote);
-    if (btnLoteCancelar) btnLoteCancelar.addEventListener('click', cerrarModalLote);
-    window.addEventListener('click', (e) => {
-        if (e.target === modalLote) cerrarModalLote();
-    });
-
-    if (btnLoteCrear) {
-        btnLoteCrear.addEventListener('click', async () => {
-            const comandos = parsearLineasLote(loteTextarea.value);
-            if (comandos.length === 0) {
-                loteError.textContent = 'Escribe al menos un comando.';
-                loteError.classList.remove('oculto');
-                return;
-            }
-
-            loteError.classList.add('oculto');
-            loteProgreso.classList.remove('oculto');
-            btnLoteCrear.disabled = true;
-            btnLoteCancelar.disabled = true;
-
-            let creados = 0;
-            const errores = [];
-
-            for (let i = 0; i < comandos.length; i++) {
-                const cmd = comandos[i];
-                const porcentaje = Math.round(((i) / comandos.length) * 100);
-                loteBarraFill.style.width = `${porcentaje}%`;
-                loteProgresoTexto.textContent = `Creando "${cmd.nombre}"… (${i + 1} de ${comandos.length})`;
-
-                try {
-                    const res = await peticionAuth('/api/admin/comandos', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(cmd)
-                    });
-                    if (res.ok) {
-                        creados++;
-                    } else {
-                        const d = await res.json();
-                        errores.push(`"${cmd.nombre}": ${d.error || 'error desconocido'}`);
-                    }
-                } catch (err) {
-                    errores.push(`"${cmd.nombre}": error de conexion`);
-                }
-            }
-
-            loteBarraFill.style.width = '100%';
-            loteProgresoTexto.textContent = `¡Listo! ${creados} de ${comandos.length} creados.`;
-            btnLoteCancelar.disabled = false;
-
-            if (errores.length > 0) {
-                loteError.textContent = 'Errores: ' + errores.join(' | ');
-                loteError.classList.remove('oculto');
-            }
-
-            if (creados > 0) {
-                mostrarToast(`${creados} comando${creados !== 1 ? 's' : ''} creado${creados !== 1 ? 's' : ''}`, 'exito');
-                cargarComandos();
-                poblarFiltrosComandos();
-            }
-
-            // Cerrar automaticamente si todo fue exitoso
-            if (errores.length === 0) {
-                setTimeout(() => cerrarModalLote(), 1200);
-            } else {
-                btnLoteCrear.disabled = false;
-            }
-        });
-    }
-
-    // =========================================================
-    // EXPORTACIONES
-    // =========================================================
-    if (btnExportarJson) btnExportarJson.addEventListener('click', () => descargarRuta('/api/admin/exportar?formato=json', 'export.json'));
-    if (btnExportarCsv) btnExportarCsv.addEventListener('click', () => descargarRuta('/api/admin/exportar?formato=csv', 'export.csv'));
-    if (btnDescargarZip) btnDescargarZip.addEventListener('click', () => descargarRuta('/api/admin/descargar-zip', 'audios.zip'));
-
-    if (btnDescargarFiltroZip) {
-        btnDescargarFiltroZip.addEventListener('click', () => {
-            const params = new URLSearchParams({
-                alias: filtroAlias ? filtroAlias.value.trim() : '',
-                comando: filtroComando ? filtroComando.value : ''
-            });
-            descargarRuta(`/api/admin/descargar-zip?${params}`, 'audios_filtrados.zip');
-        });
-    }
-
-    async function descargarRuta(ruta, nombreArchivo) {
-        try {
-            const res = await peticionAuth(ruta);
-            const blob = await res.blob();
-            descargarArchivo(blob, nombreArchivo);
-        } catch (err) {
-            mostrarToast('Error al descargar', 'error');
+            }).join('');
+        } catch (e) {
+            contenedor.innerHTML = `<div class="mensaje-error" style="padding: 20px;">Error al cargar administradores: ${e.message}</div>`;
         }
     }
 
-    function descargarArchivo(blob, nombre) {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = nombre;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-    }
-
-    // =========================================================
-    // TOAST
-    // =========================================================
-    function mostrarToast(mensaje, tipo) {
-        toast.textContent = mensaje;
-        toast.className = `toast ${tipo} visible`;
-        setTimeout(() => {
-            toast.classList.remove('visible');
-        }, 3000);
-    }
-
-    // =========================================================
-    // TAB: CONFIGURACION DE GRABACION
-    // =========================================================
-    async function cargarConfigGrabacion() {
+    // =======================================================================
+    // CONFIGURACIÓN DE AUDIO & EXPERIMENTO
+    // =======================================================================
+    async function cargarConfiguracionAudio() {
         try {
-            const res = await peticionAuth('/api/config-grabacion');
+            const res = await fetch('/api/config-grabacion');
             const data = await res.json();
-            const cfg = data.config;
+            if (data.config) {
+                datos.configGrabacion = data.config;
+                const selectDur = document.getElementById('conf-duracion');
+                const selectTasa = document.getElementById('conf-tasa');
+                const inputMeta = document.getElementById('conf-meta');
 
-            const elDuracion = document.getElementById('config-valor-duracion');
-            const elTasa = document.getElementById('config-valor-tasa');
-            const selDuracion = document.getElementById('config-duracion');
-            const selTasa = document.getElementById('config-tasa');
+                if (selectDur) selectDur.value = data.config.duracion_s || 3;
+                if (selectTasa) selectTasa.value = data.config.tasa_hz || 16000;
+                if (inputMeta) inputMeta.value = data.config.meta_por_comando || 40;
+            }
+        } catch (e) {}
+    }
 
-            if (elDuracion) elDuracion.textContent = `${cfg.duracion_s} segundo${cfg.duracion_s !== 1 ? 's' : ''}`;
-            if (elTasa) elTasa.textContent = `${cfg.tasa_hz.toLocaleString()} Hz`;
-            if (selDuracion) selDuracion.value = String(cfg.duracion_s);
-            if (selTasa) selTasa.value = String(cfg.tasa_hz);
+    async function guardarConfiguracionAudio(e) {
+        e.preventDefault();
+        const duracion_s = parseInt(document.getElementById('conf-duracion').value) || 3;
+        const tasa_hz = parseInt(document.getElementById('conf-tasa').value) || 16000;
+        const meta_por_comando = parseInt(document.getElementById('conf-meta').value) || 40;
+
+        try {
+            const res = await fetchAPI('/api/admin/config-grabacion', {
+                method: 'PUT',
+                body: JSON.stringify({ duracion_s, tasa_hz, meta_por_comando })
+            });
+            if (res.exito && res.config) {
+                datos.configGrabacion = res.config;
+                mostrarToast('Configuración de grabación actualizada', 'exito');
+                cargarStats();
+            }
         } catch (err) {
-            console.error('Error al cargar config de grabacion', err);
+            mostrarToast('Error al guardar configuración: ' + err.message, 'error');
         }
     }
 
-    const formConfig = document.getElementById('form-config-grabacion');
-    const btnRecargarConfig = document.getElementById('btn-recargar-config');
-    const configError = document.getElementById('config-error');
+    // =======================================================================
+    // EXPORTACIÓN & DESCARGA DE DATASETS
+    // =======================================================================
+    function exportarDatos(formato) {
+        let query = `formato=${formato}&token=${encodeURIComponent(token)}`;
+        if (filtros.estado !== '') query += `&valido=${filtros.estado}`;
+        window.open(`/api/admin/exportar?${query}`, '_blank');
+    }
 
-    if (formConfig) {
-        formConfig.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (configError) configError.classList.add('oculto');
+    function descargarZip() {
+        const query = new URLSearchParams();
+        if (filtros.alias) query.append('alias', filtros.alias);
+        if (filtros.comando) query.append('comando', filtros.comando);
+        query.append('token', token);
+        window.open(`/api/admin/descargar-zip?${query}`, '_blank');
+    }
 
-            const duracion_s = parseInt(document.getElementById('config-duracion').value);
-            const tasa_hz = parseInt(document.getElementById('config-tasa').value);
+    function descargarZipValidos() {
+        const query = new URLSearchParams();
+        if (filtros.alias) query.append('alias', filtros.alias);
+        if (filtros.comando) query.append('comando', filtros.comando);
+        query.append('soloValidos', 'true');
+        query.append('token', token);
+        window.open(`/api/admin/descargar-zip?${query}`, '_blank');
+    }
 
-            try {
-                const res = await peticionAuth('/api/admin/config-grabacion', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ duracion_s, tasa_hz })
-                });
-                const data = await res.json();
+    // =======================================================================
+    // MODALES Y EVENTOS GENERALES
+    // =======================================================================
+    function cerrarModal(id) {
+        const modal = document.getElementById(id);
+        if (modal) modal.classList.add('oculto');
+    }
 
-                if (data.exito) {
-                    mostrarToast(`Configuracion guardada: ${duracion_s}s | ${tasa_hz.toLocaleString()} Hz`, 'exito');
-                    cargarConfigGrabacion();
-                } else {
-                    if (configError) {
-                        configError.textContent = data.error || 'Error al guardar';
-                        configError.classList.remove('oculto');
-                    }
-                }
-            } catch (err) {
-                mostrarToast('Error de conexion al guardar config', 'error');
+    function configurarEventosModales() {
+        document.querySelectorAll('.modal-overlay').forEach(m => {
+            m.addEventListener('click', e => {
+                if (e.target === m) m.classList.add('oculto');
+            });
+        });
+
+        // Cerrar con Escape
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal-overlay:not(.oculto)').forEach(m => m.classList.add('oculto'));
             }
         });
     }
 
-    if (btnRecargarConfig) {
-        btnRecargarConfig.addEventListener('click', cargarConfigGrabacion);
-    }
-});
+    // Inicializar al cargar el DOM
+    document.addEventListener('DOMContentLoaded', init);
+
+    // API Pública expuesta en window.adminApp
+    return {
+        iniciarSesion,
+        cerrarSesion,
+        cambiarTab,
+        cargarStats,
+        cargarGrabaciones,
+        aplicarFiltrosGrabaciones,
+        limpiarFiltrosGrabaciones,
+        filtrarPorComandoRapido,
+        filtrarPorAliasRapido,
+        toggleSeleccionGrabacion,
+        toggleSeleccionTodasGrabaciones,
+        procesarLoteGrabaciones,
+        descargarZipSeleccionados,
+        toggleReproductor,
+        validarGrabacion,
+        eliminarGrabacion,
+        exportarDatos,
+        descargarZip,
+        descargarZipValidos,
+        abrirModalComando,
+        editarComando,
+        guardarComando,
+        toggleActivoComando,
+        eliminarComando,
+        toggleSeleccionComando,
+        toggleSeleccionTodosComandos,
+        eliminarComandosSeleccionados,
+        abrirModalLote,
+        actualizarPreviewLote,
+        procesarLoteComandos,
+        guardarConfiguracionAudio,
+        cerrarModal
+    };
+})();
