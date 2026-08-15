@@ -71,6 +71,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCancelarModalPerfil = document.getElementById('btn-cancelar-modal-perfil');
     const btnDescargarMiTxt = document.getElementById('btn-descargar-mi-txt');
 
+    // Código de dispositivo persistente: identifica a este navegador/dispositivo
+    // como el "dueño" de un alias, para evitar que otra persona use el mismo
+    // alias o boicotee (grabe/borre) las muestras de alguien más.
+    function obtenerCodigoDispositivo() {
+        let codigo = localStorage.getItem('recopilaVoz_codigoDispositivo');
+        if (!codigo) {
+            codigo = (window.crypto && crypto.randomUUID)
+                ? crypto.randomUUID()
+                : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            localStorage.setItem('recopilaVoz_codigoDispositivo', codigo);
+        }
+        return codigo;
+    }
+    const codigoDispositivo = obtenerCodigoDispositivo();
+
     // Estado de la sesión del participante
     let alias = sessionStorage.getItem('recopilaVoz_alias') || '';
     let perfilHablante = null;
@@ -109,21 +124,52 @@ document.addEventListener('DOMContentLoaded', () => {
     // =======================================================================
     // LISTENERS
     // =======================================================================
+    /**
+     * Reclama o verifica ante el servidor que este dispositivo puede usar el alias
+     * indicado. Si el alias ya pertenece a otro dispositivo, no deja continuar.
+     */
+    async function verificarYReclamarAlias(aliasIntentado) {
+        try {
+            const res = await fetch('/api/participantes/ingresar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ alias: aliasIntentado, codigoDispositivo })
+            });
+            const data = await res.json();
+            if (res.ok && data.exito) {
+                return { ok: true, alias: data.alias || aliasIntentado };
+            }
+            mostrarToast(data.error || 'Ese alias ya está en uso por otro participante.', 'error');
+            return { ok: false };
+        } catch (e) {
+            mostrarToast('Error de conexión al verificar el alias.', 'error');
+            return { ok: false };
+        }
+    }
+
     if (formIngreso) {
         formIngreso.addEventListener('submit', async (e) => {
             e.preventDefault();
             const nuevoAlias = aliasInput.value.trim();
-            if (nuevoAlias) {
-                const nombres = inputNombres ? inputNombres.value.trim() : '';
-                const contacto = inputContacto ? inputContacto.value.trim() : '';
-                const notas = inputNotas ? inputNotas.value.trim() : '';
+            if (!nuevoAlias) return;
 
-                if (nombres || contacto || notas) {
-                    await guardarPerfilParticipante(nuevoAlias, nombres, contacto, notas);
-                }
+            const btnSubmit = formIngreso.querySelector('button[type="submit"]');
+            if (btnSubmit) btnSubmit.disabled = true;
 
-                iniciarSesion(nuevoAlias);
+            const verificacion = await verificarYReclamarAlias(nuevoAlias);
+
+            if (btnSubmit) btnSubmit.disabled = false;
+            if (!verificacion.ok) return;
+
+            const nombres = inputNombres ? inputNombres.value.trim() : '';
+            const contacto = inputContacto ? inputContacto.value.trim() : '';
+            const notas = inputNotas ? inputNotas.value.trim() : '';
+
+            if (nombres || contacto || notas) {
+                await guardarPerfilParticipante(verificacion.alias, nombres, contacto, notas);
             }
+
+            iniciarSesion(verificacion.alias);
         });
     }
 
@@ -262,7 +308,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     alias: aliasGuardar,
                     nombres_apellidos: nombres,
                     contacto: contacto,
-                    notas: notas
+                    notas: notas,
+                    codigoDispositivo
                 })
             });
             const data = await res.json();
@@ -468,7 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            await grabador.iniciar();
+            await grabador.preparar();
             iniciarEspectrogramaVivo();
         } catch (err) {
             mostrarToast('No se pudo acceder al micrófono: ' + err.message, 'error');
@@ -479,6 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (segundosEspera > 0) {
             ejecutarCuentaRegresiva(segundosEspera);
         } else {
+            grabador.comenzarCaptura();
             comenzarCapturaVoz();
         }
     }
@@ -502,10 +550,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 Grabador.emitirBeep(440, 80);
             } else {
                 clearInterval(intCountdown);
-                // Momento exacto de hablar
+                // Momento exacto de hablar: recién aquí arranca la captura real de audio
                 if (cuentaNum) cuentaNum.textContent = '🔴';
                 if (cuentaTxt) cuentaTxt.textContent = `¡HABLA AHORA! Di: "${comandoSeleccionado.nombre}"`;
                 Grabador.emitirBeep(880, 140);
+                grabador.comenzarCaptura();
                 setTimeout(() => {
                     ocultarBannerCuenta();
                 }, 900);
@@ -685,11 +734,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cargandoSubida) cargandoSubida.classList.remove('oculto');
         if (btnConfirmar) btnConfirmar.disabled = true;
         
+        const tomaEstimativa = (conteoComandosUsuario[comandoSeleccionado.nombre] || 0) + 1;
         const formData = new FormData();
-        formData.append('audio', audioBlobTemporal, `${alias}_${comandoSeleccionado.nombre}.wav`);
+        formData.append('audio', audioBlobTemporal, `${alias}_${String(tomaEstimativa).padStart(2, '0')}_${comandoSeleccionado.nombre}.wav`);
         formData.append('alias', alias);
         formData.append('comando', comandoSeleccionado.nombre);
         formData.append('duracion_s', duracionTemporal.toFixed(2));
+        formData.append('codigoDispositivo', codigoDispositivo);
 
         try {
             const res = await fetch('/api/grabar', {
@@ -723,7 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function cargarMisGrabaciones() {
         try {
-            const res = await fetch(`/api/mis-audios?alias=${encodeURIComponent(alias)}`);
+            const res = await fetch(`/api/mis-audios?alias=${encodeURIComponent(alias)}&codigoDispositivo=${encodeURIComponent(codigoDispositivo)}`);
             const data = await res.json();
             if (!listaMisGrabaciones) return;
             
