@@ -716,12 +716,14 @@ app.get('/api/admin/stats', verificarAdmin, async (req, res) => {
 
                 if (errGrabs) {
                     console.error('[Supabase Error en grabaciones /stats]:', errGrabs.message);
+                    todasGrabaciones = memoriaGrabaciones;
                 } else if (grabsData) {
                     todasGrabaciones = grabsData;
                 }
 
                 if (errCmds) {
                     console.error('[Supabase Error en comandos /stats]:', errCmds.message);
+                    comandosActivos = memoriaComandos;
                 } else if (cmdsData) {
                     comandosActivos = cmdsData;
                 }
@@ -899,10 +901,22 @@ app.get('/api/admin/hablantes', verificarAdmin, async (req, res) => {
                     .from('hablantes_perfil')
                     .select('alias, nombres_apellidos, contacto, notas, created_at, updated_at');
 
-                if (!errGrabs && grabsData) todasGrabaciones = grabsData;
-                if (!errCmds && cmdsData) comandosLista = cmdsData;
+                if (!errGrabs && grabsData) {
+                    todasGrabaciones = grabsData;
+                } else if (errGrabs) {
+                    console.error('[Supabase Error en grabaciones /hablantes]:', errGrabs.message);
+                    todasGrabaciones = memoriaGrabaciones;
+                }
+                if (!errCmds && cmdsData) {
+                    comandosLista = cmdsData;
+                } else if (errCmds) {
+                    console.error('[Supabase Error en comandos /hablantes]:', errCmds.message);
+                    comandosLista = memoriaComandos.filter(c => c.activo);
+                }
                 if (perfsData) {
                     perfsData.forEach(p => perfilesMap.set(p.alias, p));
+                } else {
+                    perfilesMap = memoriaPerfilesHablantes;
                 }
             } catch (errSup) {
                 console.warn('[WARN /api/admin/hablantes fallback]', errSup.message);
@@ -970,6 +984,23 @@ app.get('/api/admin/hablantes', verificarAdmin, async (req, res) => {
             if (new Date(g.created_at) > new Date(h.ultimaGrabacion)) {
                 h.ultimaGrabacion = g.created_at;
             }
+        });
+
+        // Incluir también hablantes "creados" (alias reclamado vía /api/participantes/ingresar
+        // o con perfil guardado) aunque ya no tengan ninguna grabación -- por ejemplo, si se
+        // eliminaron todos sus audios. Sin esto, desaparecerían de la lista por completo.
+        perfilesMap.forEach((perfil, aliasPerfil) => {
+            if (!aliasPerfil || hablantesMap.has(aliasPerfil)) return;
+            hablantesMap.set(aliasPerfil, {
+                alias: aliasPerfil,
+                totalGrabaciones: 0,
+                validados: 0,
+                rechazados: 0,
+                sinRevisar: 0,
+                duracionTotalSegundos: 0,
+                comandosGrabados: {},
+                ultimaGrabacion: perfil.created_at || null
+            });
         });
 
         const listaHablantes = Array.from(hablantesMap.values()).map(h => {
@@ -1051,8 +1082,18 @@ app.get('/api/admin/hablantes/:alias', verificarAdmin, async (req, res) => {
                     .eq('alias', aliasSanitizado)
                     .single();
 
-                if (!errGrabs && dataGrabs) grabaciones = dataGrabs;
-                if (!errCmds && dataCmds) comandosLista = dataCmds;
+                if (!errGrabs && dataGrabs) {
+                    grabaciones = dataGrabs;
+                } else if (errGrabs) {
+                    console.error('[Supabase Error en grabaciones /hablantes/:alias]:', errGrabs.message);
+                    grabaciones = memoriaGrabaciones.filter(g => g.alias === aliasSanitizado);
+                }
+                if (!errCmds && dataCmds) {
+                    comandosLista = dataCmds;
+                } else if (errCmds) {
+                    console.error('[Supabase Error en comandos /hablantes/:alias]:', errCmds.message);
+                    comandosLista = memoriaComandos;
+                }
                 if (dataPerf) perfil = dataPerf;
             } catch (errSup) {
                 console.warn('[WARN /api/admin/hablantes/:alias fallback]', errSup.message);
@@ -1168,6 +1209,54 @@ app.get('/api/admin/hablantes/:alias', verificarAdmin, async (req, res) => {
     } catch (err) {
         console.error('[ERROR /api/admin/hablantes/:alias]', err.message);
         res.status(500).json({ error: 'Error al obtener detalle del hablante: ' + err.message });
+    }
+});
+
+/**
+ * DELETE /api/admin/hablantes/:alias
+ * Elimina por completo a un hablante: todas sus grabaciones (incluyendo los
+ * archivos de audio en Storage) y su perfil/reclamo de alias. Libera el alias
+ * para que pueda volver a usarse. Sirve para depurar hablantes "creados" que
+ * ya no tienen audios (p. ej. porque se eliminaron todas sus muestras).
+ */
+app.delete('/api/admin/hablantes/:alias', verificarAdmin, async (req, res) => {
+    try {
+        const { alias } = req.params;
+        const aliasSanitizado = alias.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
+
+        let grabacionesEliminadas = 0;
+
+        if (supabase) {
+            try {
+                const { data: grabs } = await supabase
+                    .from('grabaciones')
+                    .select('id, ruta_storage')
+                    .eq('alias', aliasSanitizado);
+
+                if (grabs && grabs.length > 0) {
+                    const rutas = grabs.map(g => g.ruta_storage).filter(r => r);
+                    if (rutas.length > 0) {
+                        await supabase.storage.from(BUCKET).remove(rutas);
+                    }
+                    await supabase.from('grabaciones').delete().eq('alias', aliasSanitizado);
+                    grabacionesEliminadas += grabs.length;
+                }
+
+                await supabase.from('hablantes_perfil').delete().eq('alias', aliasSanitizado);
+            } catch (errSup) {
+                console.warn('[WARN DELETE /api/admin/hablantes/:alias fallback]', errSup.message);
+            }
+        }
+
+        const lenInicial = memoriaGrabaciones.length;
+        memoriaGrabaciones = memoriaGrabaciones.filter(g => g.alias !== aliasSanitizado);
+        grabacionesEliminadas += (lenInicial - memoriaGrabaciones.length);
+        memoriaPerfilesHablantes.delete(aliasSanitizado);
+
+        res.json({ exito: true, alias: aliasSanitizado, grabacionesEliminadas });
+    } catch (err) {
+        console.error('[ERROR DELETE /api/admin/hablantes/:alias]', err.message);
+        res.status(500).json({ error: 'Error al eliminar el hablante: ' + err.message });
     }
 });
 
@@ -1981,8 +2070,13 @@ app.get('/api/admin/descargar-zip', verificarAdmin, async (req, res) => {
                 if (comando) consulta = consulta.eq('comando', comando);
                 if (soloValidos === 'true') consulta = consulta.eq('valido', true);
 
-                const { data } = await consulta;
-                if (data) lista = data;
+                const { data, error: errZip } = await consulta;
+                if (data) {
+                    lista = data;
+                } else if (errZip) {
+                    console.error('[Supabase Error en descargar-zip]:', errZip.message);
+                    lista = memoriaGrabaciones;
+                }
             } catch (errSup) {
                 console.warn('[WARN ZIP fallback]', errSup.message);
                 lista = memoriaGrabaciones;
