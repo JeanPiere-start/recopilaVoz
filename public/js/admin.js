@@ -943,10 +943,30 @@ const adminApp = (() => {
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
                             ZIP
                         </button>
+                        <button class="boton boton-peligro boton-pequeno" onclick="adminApp.eliminarHablante('${h.alias}')" title="Eliminar este hablante por completo">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            Eliminar
+                        </button>
                     </div>
                 </div>
             `;
         }).join('');
+    }
+
+    async function eliminarHablante(alias) {
+        if (!confirm(`¿Eliminar por completo al hablante "${alias}"?\n\nEsto borrará todas sus grabaciones (incluidos los archivos de audio) y liberará el alias para que pueda volver a usarse. Esta acción no se puede deshacer.`)) return;
+        try {
+            const res = await fetchAPI(`/api/admin/hablantes/${encodeURIComponent(alias)}`, { method: 'DELETE' });
+            mostrarToast(`Hablante "${alias}" eliminado (${res.grabacionesEliminadas || 0} grabaciones removidas)`, 'exito');
+            if (datos.hablanteActual === alias) {
+                cerrarDetalleHablante();
+            } else {
+                cargarHablantes();
+            }
+            cargarStats();
+        } catch (e) {
+            mostrarToast('Error al eliminar hablante: ' + e.message, 'error');
+        }
     }
 
     async function abrirDetalleHablante(alias) {
@@ -1821,6 +1841,7 @@ const adminApp = (() => {
         descargarZipValidos,
         cargarHablantes,
         filtrarHablantesEnCliente,
+        eliminarHablante,
         abrirDetalleHablante,
         cerrarDetalleHablante,
         filtrarAudiosHablanteDetalle,
