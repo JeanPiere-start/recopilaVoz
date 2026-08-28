@@ -105,7 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_hablantes_perfil_alias ON public.hablantes_perfil
 -- 7. Datos iniciales del vocabulario estándar H7 (control por voz)
 INSERT INTO public.comandos (nombre, descripcion, activo, orden, limite_bloque) VALUES
     ('Adelante', 'Pronuncia la palabra "Adelante" con tono natural de conversación.', true, 1, 40),
-    ('Atras', 'Pronuncia la palabra "Atras" con tono natural de conversación.', true, 2, 40),
+    ('Retrocede', 'Pronuncia la palabra "Retrocede" con tono natural de conversación.', true, 2, 40),
     ('Derecha', 'Pronuncia la palabra "Derecha" con tono natural de conversación.', true, 3, 40),
     ('Izquierda', 'Pronuncia la palabra "Izquierda" con tono natural de conversación.', true, 4, 40),
     ('Encender', 'Pronuncia la palabra "Encender" con tono natural de conversación.', true, 5, 40),
