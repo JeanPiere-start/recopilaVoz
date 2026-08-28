@@ -102,8 +102,8 @@ BEGIN
     BEGIN
         ALTER TABLE public.comandos ADD CONSTRAINT comandos_nombre_key UNIQUE (nombre);
     EXCEPTION
-        WHEN duplicate_object THEN
-            NULL; -- La restricción ya existe, no hay nada que hacer.
+        WHEN duplicate_object OR duplicate_table THEN
+            NULL; -- La restricción (o su índice) ya existe, no hay nada que hacer.
         WHEN unique_violation THEN
             RAISE NOTICE 'No se pudo crear UNIQUE en comandos.nombre: hay nombres de comando duplicados. Elimina los duplicados manualmente y vuelve a correr este script.';
     END;
@@ -111,7 +111,7 @@ BEGIN
     BEGIN
         ALTER TABLE public.hablantes_perfil ADD CONSTRAINT hablantes_perfil_alias_key UNIQUE (alias);
     EXCEPTION
-        WHEN duplicate_object THEN
+        WHEN duplicate_object OR duplicate_table THEN
             NULL;
         WHEN unique_violation THEN
             RAISE NOTICE 'No se pudo crear UNIQUE en hablantes_perfil.alias: hay alias duplicados. Elimina los duplicados manualmente y vuelve a correr este script.';
@@ -130,7 +130,7 @@ CREATE INDEX IF NOT EXISTS idx_hablantes_perfil_alias ON public.hablantes_perfil
 -- 7. Datos iniciales del vocabulario estándar H7 (control por voz)
 INSERT INTO public.comandos (nombre, descripcion, activo, orden, limite_bloque) VALUES
     ('Adelante', 'Pronuncia la palabra "Adelante" con tono natural de conversación.', true, 1, 40),
-    ('Atras', 'Pronuncia la palabra "Atras" con tono natural de conversación.', true, 2, 40),
+    ('Retrocede', 'Pronuncia la palabra "Retrocede" con tono natural de conversación.', true, 2, 40),
     ('Derecha', 'Pronuncia la palabra "Derecha" con tono natural de conversación.', true, 3, 40),
     ('Izquierda', 'Pronuncia la palabra "Izquierda" con tono natural de conversación.', true, 4, 40),
     ('Encender', 'Pronuncia la palabra "Encender" con tono natural de conversación.', true, 5, 40),
